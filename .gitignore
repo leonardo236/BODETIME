@@ -1,0 +1,62 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments and Python build output
+.venv/
+venv/
+env/
+ENV/
+build/
+dist/
+
+# Local credentials and private keys
+.env
+.env.*
+!.env.example
+**/credentials.*
+**/secrets.*
+**/*password*
+*.pem
+*.key
+*.p12
+*.pfx
+*.kdbx
+
+# IDE and operating-system state
+.vs/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.tmp
+*.temp
+*.bak
+*.log
+
+# Local databases, backups, exports, and employee data
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.sql.gz
+*.csv
+*.tsv
+*.xls
+*.xlsx
+/data/
+/datos/
+/private/
+/backups/
+/exports/
+/reports/
+trabajadores.*
+asistencias.*
