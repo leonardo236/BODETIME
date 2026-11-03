@@ -81,8 +81,15 @@ Las pruebas unitarias cubren reglas puras y generación del PDF con una fila sin
 
 Variables soportadas en `.env`: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_CHARSET`, `DB_CONNECT_TIMEOUT` y `DB_CREATE_SCHEMA`.
 
-## Alcance de la verificación
+## Alcance de la verificación local
 
-En este espacio de trabajo, `compileall` terminó correctamente y `pytest -q` reportó **5 pruebas aprobadas** para validaciones de dominio, metadatos ORM y creación del PDF con datos sintéticos de prueba. No se encontró un servidor MySQL escuchando en `127.0.0.1:3306`; por ello no se verificaron contra MySQL las operaciones CRUD, los marcajes, las consultas ni el PDF conectado a datos persistidos. La descarga de PySide6 Essentials no terminó en el tiempo disponible, así que tampoco se ejecutó una prueba visual de la ventana. Estas funciones deben demostrarse después de instalar `requirements.txt` y conectar MySQL 8; no se presentan aquí como verificadas.
+En la configuración local actual (MySQL Server 8.0.46, servicio `BODETIME80`, host `127.0.0.1`, puerto `3306`):
+
+- `python -m compileall -q bodetime main.py` terminó correctamente y `pytest -q` reportó **5 pruebas aprobadas**.
+- SQLAlchemy y PyMySQL se conectaron a MySQL, crearon y verificaron las tablas `trabajadores`, `asistencias` y `configuracion_horario`.
+- Una prueba de integración temporal comprobó alta, lectura, actualización, código duplicado, desactivación, entrada, tardanza, rechazo de entrada duplicada, salida anterior a la entrada, historial, resumen y generación ReportLab con una fila leída de MySQL. El trabajador, asistencia, horario de prueba y PDF temporal se retiraron al finalizar; no se cargaron datos personales.
+- La ventana PySide6 abrió conectada a MySQL; se navegaron Inicio, Trabajadores, Asistencia, Reportes y Configuración sin el aviso de conexión. Inicio mostró los conteos vacíos esperados.
+
+No se registraron trabajadores reales ni se configuró un horario laboral, porque esos datos deben corresponder a la bodega. Antes de marcar asistencias, registra el horario y la tolerancia aprobados en **Configuración** y agrega los trabajadores desde **Trabajadores**. La prueba de ReportLab verificó el generador con datos leídos de MySQL; no se verificó el diálogo de guardado del botón Generar PDF dentro de la interfaz.
 
 La versión no integra biometría, RFID, nómina, vacaciones, sincronización remota ni turnos múltiples.

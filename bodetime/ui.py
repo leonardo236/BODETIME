@@ -28,7 +28,12 @@ QPushButton#nav:hover { background: #1B3A53; }
 QPushButton#nav[active="true"] { background: #0E8A83; color: white; font-weight: 600; }
 QLabel#pageTitle { color: #10283F; font-size: 23pt; font-weight: 700; }
 QLabel#muted { color: #70828E; }
-QLabel#banner { color: #7A3B00; background: #FFF2D8; border: 1px solid #F1D596; border-radius: 8px; padding: 10px 12px; }
+QFrame#connectionBanner { background: #FFF2D8; border: 1px solid #F1D596; border-radius: 8px; }
+QLabel#bannerText { color: #7A3B00; padding: 9px 10px; }
+QPushButton#retryDatabase { background: #F8E5B8; color: #694000; margin: 5px; }
+QMessageBox { background: #FFFFFF; }
+QMessageBox QLabel { color: #253746; min-width: 360px; }
+QMessageBox QPushButton { min-width: 76px; }
 QFrame#card, QWidget#panel { background: white; border: 1px solid #E3EAEE; border-radius: 12px; }
 QLabel#cardValue { color: #10283F; font-size: 25pt; font-weight: 700; }
 QLabel#cardLabel { color: #70828E; font-size: 9pt; }
@@ -117,10 +122,19 @@ class MainWindow(QMainWindow):
         content_layout = QVBoxLayout(self.content)
         content_layout.setContentsMargins(28, 22, 28, 22)
         content_layout.setSpacing(16)
-        self.banner = QLabel()
-        self.banner.setObjectName("banner")
-        self.banner.setWordWrap(True)
+        self.banner = QFrame()
+        self.banner.setObjectName("connectionBanner")
         self.banner.setVisible(False)
+        banner_layout = QHBoxLayout(self.banner)
+        banner_layout.setContentsMargins(8, 4, 8, 4)
+        self.banner_text = QLabel()
+        self.banner_text.setObjectName("bannerText")
+        self.banner_text.setWordWrap(True)
+        retry = QPushButton("Reintentar conexión")
+        retry.setObjectName("retryDatabase")
+        retry.clicked.connect(self.retry_database)
+        banner_layout.addWidget(self.banner_text, 1)
+        banner_layout.addWidget(retry)
         content_layout.addWidget(self.banner)
         self.stack = QStackedWidget()
         content_layout.addWidget(self.stack, 1)
@@ -156,7 +170,7 @@ class MainWindow(QMainWindow):
 
     def set_database_error(self, message: str) -> None:
         self.database_error = message
-        self.banner.setText("No hay conexión con MySQL. La interfaz sigue disponible; las operaciones de datos se habilitarán cuando el servidor responda. " + message)
+        self.banner_text.setText("MySQL no está disponible. Puedes seguir navegando; las operaciones con datos se habilitarán cuando el servidor responda. " + message)
         self.banner.setVisible(True)
         self.statusBar().showMessage("MySQL desconectado")
 
@@ -164,6 +178,21 @@ class MainWindow(QMainWindow):
         self.database_error = None
         self.banner.setVisible(False)
         self.statusBar().showMessage("Conectado a MySQL", 5000)
+
+    @staticmethod
+    def _error_detail(error: Exception) -> str:
+        original = getattr(error, "orig", None)
+        return str(original) if original is not None else str(error)
+
+    def retry_database(self) -> None:
+        try:
+            self.service.database.initialize()
+            self.clear_database_error()
+            self.refresh_all()
+            QMessageBox.information(self, "Conexión restablecida", "BODETIME se conectó a MySQL y actualizó las pantallas.")
+        except Exception as exc:
+            self.set_database_error(self._error_detail(exc))
+            QMessageBox.warning(self, "MySQL no disponible", "No se pudo conectar con el servidor. Comprueba que MySQL Server esté iniciado y que el archivo .env tenga los datos correctos.\n\n" + self._error_detail(exc))
 
     def _guard(self, callback, *args):
         try:
@@ -173,8 +202,9 @@ class MainWindow(QMainWindow):
         except ValidationError as exc:
             QMessageBox.warning(self, "Revisa la información", str(exc))
         except Exception as exc:
-            self.set_database_error(str(exc))
-            QMessageBox.critical(self, "Error de operación", f"No se pudo completar la operación.\n\nDetalle: {exc}")
+            detail = self._error_detail(exc)
+            self.set_database_error(detail)
+            QMessageBox.warning(self, "MySQL no disponible", "No se pudo completar la operación. Comprueba el estado del servidor y la conexión configurada.\n\n" + detail)
         return None
 
     def refresh_all(self) -> None:
@@ -224,8 +254,7 @@ class MainWindow(QMainWindow):
             self._fill_attendance_table(self.dashboard_table, rows)
             self.clear_database_error()
         except Exception as exc:
-            if not silent:
-                self._guard(lambda: (_ for _ in ()).throw(exc))
+            self.set_database_error(self._error_detail(exc))
 
     def _build_workers(self) -> None:
         page = QWidget()
@@ -275,7 +304,7 @@ class MainWindow(QMainWindow):
                     _put(self.workers_table, row, col, value, worker.id if col == 0 else None)
             self.clear_database_error()
         except Exception as exc:
-            if not silent: self._guard(lambda: (_ for _ in ()).throw(exc))
+            self.set_database_error(self._error_detail(exc))
 
     def save_worker(self) -> None:
         values = (self.worker_code.text(), self.worker_first.text(), self.worker_last.text(), self.worker_role.text(), self.worker_phone.text())
@@ -358,7 +387,7 @@ class MainWindow(QMainWindow):
             self.att_filter_worker.blockSignals(False)
             self.clear_database_error()
         except Exception as exc:
-            if not silent: self._guard(lambda: (_ for _ in ()).throw(exc))
+            self.set_database_error(self._error_detail(exc))
 
     def _fill_attendance_table(self, table: QTableWidget, rows: list[AttendanceRow]) -> None:
         table.setRowCount(0)
@@ -374,7 +403,7 @@ class MainWindow(QMainWindow):
             self._fill_attendance_table(self.attendance_table, rows)
             self.clear_database_error()
         except Exception as exc:
-            if not silent: self._guard(lambda: (_ for _ in ()).throw(exc))
+            self.set_database_error(self._error_detail(exc))
 
     def mark_entry(self) -> None:
         worker_id = self.att_worker.currentData()
@@ -423,7 +452,7 @@ class MainWindow(QMainWindow):
             idx = self.report_worker.findData(selected); self.report_worker.setCurrentIndex(max(idx, 0))
             self.clear_database_error()
         except Exception as exc:
-            if not silent: self._guard(lambda: (_ for _ in ()).throw(exc))
+            self.set_database_error(self._error_detail(exc))
 
     def generate_report(self) -> None:
         start, end = self.report_start.date().toPython(), self.report_end.date().toPython()
