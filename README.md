@@ -75,7 +75,7 @@ Activa el entorno e invoca:
 pytest -q
 ```
 
-Las pruebas unitarias cubren reglas puras y generación del PDF con una fila sintética identificada expresamente como fixture. No comprueban persistencia MySQL. Para certificar el CRUD y marcajes reales, ejecuta las operaciones desde la aplicación conectada a una instancia MySQL 8 y confirma los registros en Workbench; registra evidencias observadas antes de la defensa.
+Las pruebas unitarias cubren las reglas de dominio, los mensajes de diagnóstico para errores de conexión de Windows y la protección de credenciales, además de la generación del PDF con una fila sintética identificada expresamente como fixture. La integración con MySQL se verifica por separado y usa registros temporales que se eliminan al terminar.
 
 ## Esquema y configuración
 
@@ -85,13 +85,13 @@ Variables soportadas en `.env`: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_
 
 ## Alcance de la verificación local
 
-En la configuración local actual (MySQL Server 8.0.46, servicio `BODETIME80`, host `127.0.0.1`, puerto `3306`):
+En la configuración local revisada el 3 de noviembre de 2026 (MySQL 8, servicio Windows `MySQL80`, host `127.0.0.1`, puerto `3306`):
 
-- `python -m compileall -q bodetime main.py` terminó correctamente y `pytest -q` reportó **5 pruebas aprobadas**.
-- SQLAlchemy y PyMySQL se conectaron a MySQL, crearon y verificaron las tablas `trabajadores`, `asistencias` y `configuracion_horario`.
-- Una prueba de integración temporal comprobó alta, lectura, actualización, código duplicado, desactivación, entrada, tardanza, rechazo de entrada duplicada, salida anterior a la entrada, historial, resumen y generación ReportLab con una fila leída de MySQL. El trabajador, asistencia, horario de prueba y PDF temporal se retiraron al finalizar; no se cargaron datos personales.
-- La ventana PySide6 abrió conectada a MySQL; se navegaron Inicio, Trabajadores, Asistencia, Reportes y Configuración sin el aviso de conexión. Inicio mostró los conteos vacíos esperados.
+- `python -m compileall -q bodetime main.py` terminó correctamente y la última ejecución de `pytest -q` reportó **8 pruebas aprobadas**.
+- La consulta de conexión SQLAlchemy/PyMySQL y la aplicación pudieron leer la base MySQL. La ventana PySide6 quedó abierta y el panel confirmó el estado **MySQL conectado**.
+- Una verificación de integración temporal comprobó alta, lectura, actualización, código duplicado, desactivación, entradas y salidas válidas, rechazo de marcajes inválidos o duplicados, historial y generación ReportLab con filas recuperadas de MySQL. Los registros temporales y el PDF se eliminaron y la configuración de horario previa se restauró. No se incluyeron datos personales en el repositorio.
+- `git diff --check` terminó sin errores y se confirmó que `.env` y los entornos locales están excluidos de Git.
 
-No se registraron trabajadores reales ni se configuró un horario laboral, porque esos datos deben corresponder a la bodega. Antes de marcar asistencias, registra el horario y la tolerancia aprobados en **Configuración** y agrega los trabajadores desde **Trabajadores**. La prueba de ReportLab verificó el generador con datos leídos de MySQL; no se verificó el diálogo de guardado del botón Generar PDF dentro de la interfaz.
+El esquema y la interfaz se contrastaron con los cinco criterios de la rúbrica de pre-defensa. La plantilla JUDC aporta la estructura de exposición (introducción, objetivos, metodología, resultados y discusión, conclusiones), no criterios funcionales adicionales. Usa la configuración laboral y los datos autorizados por la bodega para la demostración.
 
 La versión no integra biometría, RFID, nómina, vacaciones, sincronización remota ni turnos múltiples.

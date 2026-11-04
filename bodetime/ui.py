@@ -3,9 +3,8 @@ from __future__ import annotations
 from datetime import date, timedelta
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTime, QTimer
+from PySide6.QtCore import QEasingCurve, QPropertyAnimation, Qt, QTime, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QComboBox, QDateEdit, QFileDialog, QFrame,
     QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox, QProgressBar, QPushButton,
@@ -18,61 +17,61 @@ from .services import BodeTimeService, ValidationError, AttendanceRow
 
 
 STYLESHEET = """
-QWidget { font-family: 'Segoe UI'; font-size: 10pt; color: #203444; }
-QMainWindow, QWidget#content { background: #F2F5F7; }
-QWidget#sidebar { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #10283F, stop:1 #0B1D2E); }
-QFrame#brandMark { background: #16A69B; border: 1px solid #42C3B6; border-radius: 15px; }
+QWidget { font-family: 'Segoe UI'; font-size: 10pt; color: #26392E; }
+QMainWindow, QWidget#content { background: #F4F7F2; }
+QWidget#sidebar { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #173B32, stop:1 #102D27); }
+QFrame#brandMark { background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #9BCB70, stop:1 #62A66C); border: 1px solid #B3D68F; border-radius: 14px; }
 QLabel#brandGlyph { color: white; font-size: 23pt; font-weight: 800; }
 QLabel#brand { color: white; font-size: 17pt; font-weight: 750; }
-QLabel#brandSub { color: #9FB5C5; font-size: 8pt; letter-spacing: 1px; }
-QLabel#navCaption { color: #698398; font-size: 8pt; font-weight: 700; letter-spacing: 1.2px; padding: 22px 12px 7px; }
-QFrame#sideRule { background: #294155; max-height: 1px; }
-QPushButton#nav { color: #C4D2DC; background: transparent; border: 0; border-left: 3px solid transparent; border-radius: 9px; text-align: left; padding: 12px 13px; font-size: 10.5pt; }
-QPushButton#nav:hover { color: white; background: #19384F; }
-QPushButton#nav[active="true"] { color: white; background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0D817D, stop:1 #126C70); border-left: 3px solid #60D5C5; font-weight: 650; }
-QLabel#pageTitle { color: #10283F; font-size: 25pt; font-weight: 750; }
-QLabel#muted { color: #718391; }
-QLabel#topContext { color: #7A8C98; font-size: 8pt; font-weight: 700; letter-spacing: 1.1px; }
-QLabel#topDate { color: #334C5E; font-size: 9pt; font-weight: 600; padding: 8px 12px; background: #E7EDF0; border-radius: 10px; }
+QLabel#brandSub { color: #A8C0B0; font-size: 8pt; letter-spacing: 1px; }
+QLabel#navCaption { color: #829F8C; font-size: 8pt; font-weight: 700; letter-spacing: 1.2px; padding: 22px 12px 7px; }
+QFrame#sideRule { background: #315448; max-height: 1px; }
+QPushButton#nav { color: #CFDBD0; background: transparent; border: 0; border-left: 3px solid transparent; border-radius: 8px; text-align: left; padding: 12px 13px; font-size: 10.5pt; }
+QPushButton#nav:hover { color: white; background: #21483B; }
+QPushButton#nav[active="true"] { color: white; background: #2A6048; border-left: 3px solid #B5DB7F; font-weight: 650; }
+QLabel#pageTitle { color: #1A3C30; font-size: 24pt; font-weight: 750; }
+QLabel#muted { color: #718276; }
+QLabel#topContext { color: #788D7D; font-size: 8pt; font-weight: 700; letter-spacing: 1.1px; }
+QLabel#topDate { color: #365344; font-size: 9pt; font-weight: 600; padding: 8px 12px; background: #E7EEE4; border-radius: 8px; }
 QFrame#connectionBanner { background: #FFF4DF; border: 1px solid #F0D8A8; border-radius: 12px; }
 QLabel#bannerText { color: #75430C; padding: 9px 10px; }
 QPushButton#retryDatabase { background: #F6E4BD; color: #694000; margin: 5px; }
 QMessageBox { background: #FFFFFF; }
-QMessageBox QLabel { color: #253746; min-width: 360px; }
+QMessageBox QLabel { color: #26392E; min-width: 360px; }
 QMessageBox QPushButton { min-width: 76px; }
-QFrame#metricCard, QWidget#panel { background: white; border: 1px solid #E3EAEE; border-radius: 15px; }
-QFrame#metricCard:hover { border-color: #BDD8D8; }
-QFrame#metricIcon { background: #E6F5F2; border-radius: 12px; }
-QLabel#metricGlyph { color: #087E78; font-size: 15pt; font-weight: 700; }
-QLabel#metricValue { color: #10283F; font-size: 25pt; font-weight: 750; }
-QLabel#metricLabel { color: #6D808D; font-size: 9pt; font-weight: 600; }
-QLabel#metricHint { color: #9AA8B1; font-size: 8pt; }
-QLabel#sectionTitle { color: #10283F; font-size: 12pt; font-weight: 700; }
-QLabel#eyebrow { color: #8CBAB7; font-size: 8pt; font-weight: 700; letter-spacing: 1.6px; }
-QLabel#heroTitle { color: white; font-size: 23pt; font-weight: 750; }
-QLabel#heroCaption { color: #C3D8DF; font-size: 10pt; }
-QFrame#dashboardHero { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #10283F, stop:0.62 #14515C, stop:1 #0E817B); border: 0; border-radius: 19px; }
-QFrame#heroClock { background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.20); border-radius: 15px; }
-QLabel#clockValue { color: white; font-size: 27pt; font-weight: 700; }
-QLabel#clockCaption { color: #C3D8DF; font-size: 8pt; font-weight: 650; letter-spacing: 1px; }
+QFrame#metricPanel, QWidget#panel { background: white; border: 1px solid #DFE8DD; border-radius: 12px; }
+QFrame#metricPanel { background: #FFFFFF; }
+QFrame#metricDivider { background: #E5ECE3; max-width: 1px; }
+QLabel#metricValue { color: #285A40; font-size: 24pt; font-weight: 750; }
+QLabel#metricLabel { color: #52685A; font-size: 9pt; font-weight: 650; }
+QLabel#metricHint { color: #89978C; font-size: 8pt; }
+QLabel#sectionTitle { color: #1E4132; font-size: 12pt; font-weight: 700; }
+QLabel#eyebrow { color: #4F815B; font-size: 8pt; font-weight: 700; letter-spacing: 1.2px; }
+QLabel#heroTitle { color: #244A35; font-size: 20pt; font-weight: 700; }
+QLabel#heroCaption { color: #687C6B; font-size: 10pt; }
+QFrame#dashboardHero { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #EFF5E9, stop:1 #E4EFE1); border: 1px solid #DCE8D6; border-radius: 13px; }
+QFrame#heroClock { background: transparent; border: 0; }
+QLabel#clockValue { color: #28533B; font-size: 25pt; font-weight: 700; }
+QLabel#clockCaption { color: #66816D; font-size: 8pt; font-weight: 650; letter-spacing: 0.7px; }
 QFrame#panelHeader { background: transparent; }
-QLabel#insightValue { color: #10283F; font-size: 21pt; font-weight: 750; }
-QLabel#insightLabel { color: #70828E; font-size: 9pt; }
-QProgressBar { background: #E8EEF1; border: 0; border-radius: 5px; height: 9px; text-align: center; }
-QProgressBar::chunk { background: #0E9A8D; border-radius: 5px; }
-QLabel#insightNote { color: #82929D; font-size: 8pt; }
-QLineEdit, QComboBox, QDateEdit, QTimeEdit, QSpinBox { background: white; border: 1px solid #D7E1E6; border-radius: 9px; padding: 9px 10px; min-height: 21px; selection-background-color: #0E8A83; }
-QLineEdit:focus, QComboBox:focus, QDateEdit:focus, QTimeEdit:focus, QSpinBox:focus { border: 1px solid #15968C; }
-QPushButton { background: #E7EDF0; border: 0; border-radius: 9px; padding: 10px 15px; color: #18354C; font-weight: 650; }
-QPushButton:hover { background: #D8E4E9; }
-QPushButton#primary { background: #0E8A83; color: white; }
-QPushButton#primary:hover { background: #0B756F; }
+QLabel#insightValue { color: #285A40; font-size: 21pt; font-weight: 750; }
+QLabel#insightLabel { color: #687C6D; font-size: 9pt; }
+QProgressBar { background: #E7EEE4; border: 0; border-radius: 5px; height: 9px; text-align: center; }
+QProgressBar::chunk { background: #78AD65; border-radius: 5px; }
+QLabel#insightNote { color: #7B8D7E; font-size: 8pt; }
+QLineEdit, QComboBox, QDateEdit, QTimeEdit, QSpinBox { background: white; border: 1px solid #D4DFD3; border-radius: 8px; padding: 9px 10px; min-height: 21px; selection-background-color: #6D9F5E; }
+QLineEdit:focus, QComboBox:focus, QDateEdit:focus, QTimeEdit:focus, QSpinBox:focus { border: 1px solid #6D9F5E; }
+QPushButton { background: #E7EEE4; border: 0; border-radius: 8px; padding: 10px 15px; color: #294638; font-weight: 650; }
+QPushButton:hover { background: #D9E6D5; }
+QPushButton:focus { border: 1px solid #9BC37B; }
+QPushButton#primary { background: #387A55; color: white; }
+QPushButton#primary:hover { background: #2E6848; }
 QPushButton#danger { background: #FCE9E7; color: #A6312A; }
-QTableWidget { background: white; border: 1px solid #E3EAEE; border-radius: 11px; gridline-color: #EDF1F3; selection-background-color: #D9F0EE; selection-color: #10283F; alternate-background-color: #F8FAFB; outline: none; }
-QHeaderView::section { background: #F6F8F9; border: 0; border-bottom: 1px solid #DEE7EB; padding: 11px 9px; color: #718391; font-size: 8pt; font-weight: 700; }
-QTableWidget::item { padding: 9px 7px; border-bottom: 1px solid #F0F3F5; }
+QTableWidget { background: white; border: 1px solid #DFE8DD; border-radius: 10px; gridline-color: #EDF2EB; selection-background-color: #E0EEDB; selection-color: #244A35; alternate-background-color: #FAFCF9; outline: none; }
+QHeaderView::section { background: #F1F5EF; border: 0; border-bottom: 1px solid #DCE6D9; padding: 11px 9px; color: #687D6D; font-size: 8pt; font-weight: 700; }
+QTableWidget::item { padding: 9px 7px; border-bottom: 1px solid #EFF3ED; }
 QScrollBar:vertical { background: transparent; width: 8px; margin: 4px 1px; }
-QScrollBar::handle:vertical { background: #C8D4DA; border-radius: 4px; min-height: 30px; }
+QScrollBar::handle:vertical { background: #C4D3C1; border-radius: 4px; min-height: 30px; }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
 """
 
@@ -121,6 +120,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("BODETIME | Control de asistencia")
         self.setMinimumSize(1120, 740)
         self.resize(1320, 820)
+        self.setWindowOpacity(0.0)
         root = QWidget()
         root_layout = QHBoxLayout(root)
         root_layout.setContentsMargins(0, 0, 0, 0)
@@ -155,6 +155,11 @@ class MainWindow(QMainWindow):
 
         self.content = QWidget()
         self.content.setObjectName("content")
+        self._intro_started = False
+        self._intro_finished = False
+        self.window_animation = QPropertyAnimation(self, b"windowOpacity", self)
+        self.window_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self.window_animation.finished.connect(self._finish_intro)
         content_layout = QVBoxLayout(self.content)
         content_layout.setContentsMargins(30, 20, 30, 24)
         content_layout.setSpacing(15)
@@ -199,7 +204,15 @@ class MainWindow(QMainWindow):
             self.refresh_all()
 
     def navigate(self, index: int) -> None:
+        changed = self.stack.currentIndex() != index
         self.stack.setCurrentIndex(index)
+        if changed and self._intro_finished:
+            self.window_animation.stop()
+            self.setWindowOpacity(0.92)
+            self.window_animation.setDuration(180)
+            self.window_animation.setStartValue(0.92)
+            self.window_animation.setEndValue(1.0)
+            self.window_animation.start()
         for i, button in enumerate(self.nav_buttons):
             button.setProperty("active", i == index)
             button.style().unpolish(button)
@@ -214,13 +227,25 @@ class MainWindow(QMainWindow):
         elif index == 4:
             self.refresh_settings()
 
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        if not self._intro_started:
+            self._intro_started = True
+            self.window_animation.setDuration(520)
+            self.window_animation.setStartValue(0.0)
+            self.window_animation.setEndValue(1.0)
+            QTimer.singleShot(50, self.window_animation.start)
+
+    def _finish_intro(self) -> None:
+        self._intro_finished = True
+
     def set_database_error(self, message: str) -> None:
         self.database_error = message
-        self.banner_text.setText("MySQL no está disponible. Puedes seguir navegando; las operaciones con datos se habilitarán cuando el servidor responda. " + message)
+        self.banner_text.setText(self._connection_advice(message))
         self.banner.setVisible(True)
         if hasattr(self, "dashboard_connection"):
             self.dashboard_connection.setText("●  SIN CONEXIÓN A MYSQL")
-            self.dashboard_connection.setStyleSheet("color:#9A5A16; background:#FFF0D5; border-radius:10px; padding:8px 12px;")
+            self.dashboard_connection.setStyleSheet("color:#8A591D; background:#FFF0D5; border-radius:8px; padding:8px 12px;")
         self.statusBar().showMessage("MySQL desconectado")
 
     def clear_database_error(self) -> None:
@@ -228,13 +253,32 @@ class MainWindow(QMainWindow):
         self.banner.setVisible(False)
         if hasattr(self, "dashboard_connection"):
             self.dashboard_connection.setText("●  MYSQL CONECTADO")
-            self.dashboard_connection.setStyleSheet("color:#0B847C; background:#E1F2EF; border-radius:10px; padding:8px 12px;")
+            self.dashboard_connection.setStyleSheet("color:#3C754F; background:#E7F1E4; border-radius:8px; padding:8px 12px;")
         self.statusBar().showMessage("Conectado a MySQL", 5000)
 
     @staticmethod
     def _error_detail(error: Exception) -> str:
         original = getattr(error, "orig", None)
         return str(original) if original is not None else str(error)
+
+    @staticmethod
+    def _connection_advice(message: str) -> str:
+        detail = message.lower()
+        if "10013" in detail or "wsaeacces" in detail:
+            return (
+                "Windows rechazó el acceso al puerto local de MySQL. Revisa si el firewall o el antivirus "
+                "bloqueó Python y confirma que el puerto configurado esté permitido."
+            )
+        if "10061" in detail or "econnrefused" in detail:
+            return (
+                "No hay un servidor MySQL escuchando en la dirección y puerto configurados. "
+                "En Servicios, confirma que el servicio MySQL esté en ejecución y revisa DB_HOST y DB_PORT en .env."
+            )
+        if "1045" in detail or "access denied" in detail:
+            return "MySQL rechazó las credenciales. Revisa DB_USER y DB_PASSWORD en tu archivo .env local."
+        if "1049" in detail or "unknown database" in detail:
+            return "MySQL no encuentra la base de datos configurada. Revisa DB_NAME y ejecuta schema.sql."
+        return "BODETIME no pudo conectarse con MySQL. Comprueba el servidor y la configuración local del archivo .env."
 
     def retry_database(self) -> None:
         try:
@@ -243,8 +287,9 @@ class MainWindow(QMainWindow):
             self.refresh_all()
             QMessageBox.information(self, "Conexión restablecida", "BODETIME se conectó a MySQL y actualizó las pantallas.")
         except Exception as exc:
-            self.set_database_error(self._error_detail(exc))
-            QMessageBox.warning(self, "MySQL no disponible", "No se pudo conectar con el servidor. Comprueba que MySQL Server esté iniciado y que el archivo .env tenga los datos correctos.\n\n" + self._error_detail(exc))
+            detail = self._error_detail(exc)
+            self.set_database_error(detail)
+            QMessageBox.warning(self, "MySQL no disponible", self._connection_advice(detail) + "\n\nDetalle técnico: " + detail)
 
     def _guard(self, callback, *args):
         try:
@@ -256,7 +301,7 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             detail = self._error_detail(exc)
             self.set_database_error(detail)
-            QMessageBox.warning(self, "MySQL no disponible", "No se pudo completar la operación. Comprueba el estado del servidor y la conexión configurada.\n\n" + detail)
+            QMessageBox.warning(self, "MySQL no disponible", self._connection_advice(detail) + "\n\nDetalle técnico: " + detail)
         return None
 
     def refresh_all(self) -> None:
@@ -276,57 +321,55 @@ class MainWindow(QMainWindow):
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(14)
+        layout.setSpacing(13)
         heading = QHBoxLayout()
-        heading.addWidget(_label("Panel de control", "pageTitle"))
+        heading.addWidget(_label("Resumen de hoy", "pageTitle"))
         heading.addStretch(1)
         self.dashboard_connection = _label("●  MYSQL CONECTADO", "topContext")
-        self.dashboard_connection.setStyleSheet("color:#0B847C; background:#E1F2EF; border-radius:10px; padding:8px 12px;")
+        self.dashboard_connection.setStyleSheet("color:#3C754F; background:#E7F1E4; border-radius:8px; padding:8px 12px;")
         heading.addWidget(self.dashboard_connection)
         layout.addLayout(heading)
 
         hero = QFrame(); hero.setObjectName("dashboardHero")
-        hero_layout = QHBoxLayout(hero); hero_layout.setContentsMargins(26, 20, 22, 20); hero_layout.setSpacing(18)
-        hero_copy = QVBoxLayout(); hero_copy.setSpacing(5)
-        hero_copy.addWidget(_label("CONTROL DE JORNADA  /  LEÓN", "eyebrow"))
-        hero_copy.addWidget(_label("Un equipo en ritmo.", "heroTitle"))
-        hero_copy.addWidget(_label("Asistencia y operación, al día en un solo lugar.", "heroCaption"))
+        hero_layout = QHBoxLayout(hero); hero_layout.setContentsMargins(24, 15, 22, 15); hero_layout.setSpacing(18)
+        hero_copy = QVBoxLayout(); hero_copy.setSpacing(4)
+        hero_copy.addWidget(_label("CONTROL DE ASISTENCIA", "eyebrow"))
+        hero_copy.addWidget(_label("Jornada laboral", "heroTitle"))
+        hero_copy.addWidget(_label("Entradas, salidas y puntualidad del personal", "heroCaption"))
         hero_layout.addLayout(hero_copy, 1)
-        clock_panel = QFrame(); clock_panel.setObjectName("heroClock"); clock_panel.setMinimumWidth(150)
-        clock_layout = QVBoxLayout(clock_panel); clock_layout.setContentsMargins(18, 10, 18, 10); clock_layout.setSpacing(0)
-        clock_layout.addWidget(_label("HORA LOCAL", "clockCaption"), 0, Qt.AlignmentFlag.AlignRight)
+        clock_panel = QFrame(); clock_panel.setObjectName("heroClock"); clock_panel.setMinimumWidth(166)
+        clock_layout = QVBoxLayout(clock_panel); clock_layout.setContentsMargins(12, 7, 8, 7); clock_layout.setSpacing(0)
+        clock_layout.addWidget(_label("HORA LOCAL · LEÓN", "clockCaption"), 0, Qt.AlignmentFlag.AlignRight)
         self.hero_clock = _label("--:--", "clockValue"); self.hero_clock.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.hero_date = _label("", "clockCaption"); self.hero_date.setAlignment(Qt.AlignmentFlag.AlignRight)
         clock_layout.addWidget(self.hero_clock); clock_layout.addWidget(self.hero_date)
         hero_layout.addWidget(clock_panel)
         layout.addWidget(hero)
 
-        cards = QHBoxLayout()
-        cards.setSpacing(12)
+        metric_panel = QFrame(); metric_panel.setObjectName("metricPanel")
+        metrics = QHBoxLayout(metric_panel); metrics.setContentsMargins(0, 0, 0, 0); metrics.setSpacing(0)
         self.dashboard_values: list[QLabel] = []
         metric_specs = [
-            ("Trabajadores activos", "Personal habilitado", "◉"),
-            ("Asistencias de hoy", "Registros del día", "✓"),
-            ("Llegadas tarde", "Fuera de tolerancia", "↗"),
-            ("Turnos abiertos", "Aún en jornada", "◷"),
+            ("Trabajadores activos", "Personal habilitado"),
+            ("Asistencias de hoy", "Marcajes registrados"),
+            ("Llegadas tarde", "Fuera de tolerancia"),
+            ("Turnos abiertos", "Sin salida registrada"),
         ]
-        for title, hint, glyph in metric_specs:
-            card = QFrame(); card.setObjectName("metricCard"); card.setMinimumHeight(112)
-            box = QHBoxLayout(card); box.setContentsMargins(15, 14, 14, 14); box.setSpacing(12)
-            icon = QFrame(); icon.setObjectName("metricIcon"); icon.setFixedSize(40, 40)
-            icon_layout = QVBoxLayout(icon); icon_layout.setContentsMargins(0, 0, 0, 0)
-            icon_layout.addWidget(_label(glyph, "metricGlyph"), 0, Qt.AlignmentFlag.AlignCenter)
-            box.addWidget(icon, 0, Qt.AlignmentFlag.AlignTop)
-            detail = QVBoxLayout(); detail.setSpacing(1)
-            value = _label("—", "metricValue")
-            self.dashboard_values.append(value)
-            detail.addWidget(value); detail.addWidget(_label(title, "metricLabel")); detail.addWidget(_label(hint, "metricHint"))
-            box.addLayout(detail, 1)
-            cards.addWidget(card)
-        layout.addLayout(cards)
+        for index, (title, hint) in enumerate(metric_specs):
+            block = QWidget(); block.setMinimumHeight(100)
+            block_layout = QVBoxLayout(block); block_layout.setContentsMargins(20, 14, 15, 13); block_layout.setSpacing(1)
+            value = _label("—", "metricValue"); self.dashboard_values.append(value)
+            block_layout.addWidget(value)
+            block_layout.addWidget(_label(title, "metricLabel"))
+            block_layout.addWidget(_label(hint, "metricHint"))
+            metrics.addWidget(block, 1)
+            if index < len(metric_specs) - 1:
+                divider = QFrame(); divider.setObjectName("metricDivider"); divider.setFrameShape(QFrame.Shape.VLine)
+                metrics.addWidget(divider)
+        layout.addWidget(metric_panel)
 
-        lower = QHBoxLayout(); lower.setSpacing(14)
-        activity_panel = _panel(); activity_box = QVBoxLayout(activity_panel); activity_box.setContentsMargins(18, 16, 18, 16); activity_box.setSpacing(12)
+        lower = QHBoxLayout(); lower.setSpacing(13)
+        activity_panel = _panel(); activity_box = QVBoxLayout(activity_panel); activity_box.setContentsMargins(17, 15, 17, 15); activity_box.setSpacing(10)
         bar = QHBoxLayout()
         bar.addWidget(_label("Registro de hoy", "sectionTitle"))
         bar.addStretch(1)
@@ -340,17 +383,20 @@ class MainWindow(QMainWindow):
         activity_box.addWidget(self.dashboard_table, 1)
         lower.addWidget(activity_panel, 1)
 
-        insight = _panel(); insight.setFixedWidth(220)
+        insight = _panel(); insight.setFixedWidth(226)
         insight_box = QVBoxLayout(insight); insight_box.setContentsMargins(18, 18, 18, 18); insight_box.setSpacing(12)
-        insight_box.addWidget(_label("RITMO DE HOY", "eyebrow"))
+        insight_box.addWidget(_label("AVANCE DE LA JORNADA", "eyebrow"))
         self.insight_ratio = _label("— / —", "insightValue")
         insight_box.addWidget(self.insight_ratio)
-        insight_box.addWidget(_label("del equipo ya marcó entrada", "insightLabel"))
+        insight_box.addWidget(_label("personas con entrada registrada", "insightLabel"))
         self.attendance_progress = QProgressBar(); self.attendance_progress.setRange(0, 100); self.attendance_progress.setValue(0); self.attendance_progress.setTextVisible(False)
+        self.progress_animation = QPropertyAnimation(self.attendance_progress, b"value", self)
+        self.progress_animation.setDuration(420)
+        self.progress_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
         insight_box.addWidget(self.attendance_progress)
         self.insight_percent = _label("Sin registros todavía", "insightNote")
         insight_box.addWidget(self.insight_percent)
-        divider = QFrame(); divider.setObjectName("sideRule"); divider.setFrameShape(QFrame.Shape.HLine); insight_box.addWidget(divider)
+        divider = QFrame(); divider.setObjectName("metricDivider"); divider.setFrameShape(QFrame.Shape.HLine); insight_box.addWidget(divider)
         insight_box.addWidget(_label("El resumen se actualiza desde MySQL.", "insightNote"))
         insight_box.addStretch(1)
         lower.addWidget(insight)
@@ -365,7 +411,10 @@ class MainWindow(QMainWindow):
             marked_ratio = min(summary.present_today, summary.active_workers)
             percentage = round(marked_ratio * 100 / summary.active_workers) if summary.active_workers else 0
             self.insight_ratio.setText(f"{marked_ratio} / {summary.active_workers}")
-            self.attendance_progress.setValue(percentage)
+            self.progress_animation.stop()
+            self.progress_animation.setStartValue(self.attendance_progress.value())
+            self.progress_animation.setEndValue(percentage)
+            self.progress_animation.start()
             self.insight_percent.setText(f"{percentage}% del equipo registrado" if summary.active_workers else "Registra trabajadores para iniciar")
             rows = self.service.attendance_history(date.today(), date.today())
             self._fill_attendance_table(self.dashboard_table, rows)

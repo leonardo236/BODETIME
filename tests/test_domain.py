@@ -5,6 +5,7 @@ import pytest
 from bodetime.reports import generate_attendance_pdf
 from bodetime.models import Attendance, Worker
 from bodetime.services import AttendanceRow, BodeTimeService, ValidationError, is_late
+from bodetime.ui import MainWindow
 
 
 def test_worker_code_is_trimmed_and_uppercased():
@@ -39,3 +40,21 @@ def test_report_pdf_is_created_with_table(tmp_path):
     content = path.read_bytes()
     assert content.startswith(b"%PDF-")
     assert len(content) > 1000
+
+
+@pytest.mark.parametrize(
+    ("detail", "expected"),
+    [
+        ("WinError 10013", "firewall o el antivirus"),
+        ("WinError 10061", "servicio MySQL esté en ejecución"),
+    ],
+)
+def test_mysql_connection_advice_matches_windows_socket_error(detail, expected):
+    assert expected in MainWindow._connection_advice(detail)
+
+
+def test_mysql_credential_advice_does_not_expose_password():
+    advice = MainWindow._connection_advice("1045 Access denied")
+    assert "DB_USER" in advice
+    assert "DB_PASSWORD" in advice
+    assert "leo123456789" not in advice
