@@ -12,6 +12,7 @@ htmlcov/
 # Virtual environments and Python build output
 .venv/
 .venv-*/
+.python-runtime/
 venv/
 env/
 ENV/

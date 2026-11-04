@@ -8,7 +8,7 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QComboBox, QDateEdit, QFileDialog, QFrame,
-    QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton,
+    QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox, QProgressBar, QPushButton,
     QSpinBox, QStackedWidget, QTableWidget, QTableWidgetItem, QTimeEdit,
     QVBoxLayout, QWidget,
 )
