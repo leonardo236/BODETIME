@@ -94,4 +94,6 @@ En la configuración local revisada el 3 de noviembre de 2026 (MySQL 8, servicio
 
 El esquema y la interfaz se contrastaron con los cinco criterios de la rúbrica de pre-defensa. La plantilla JUDC aporta la estructura de exposición (introducción, objetivos, metodología, resultados y discusión, conclusiones), no criterios funcionales adicionales. Usa la configuración laboral y los datos autorizados por la bodega para la demostración.
 
+La generación del PDF con filas leídas de MySQL se verificó en la prueba de integración; no se comprobó manualmente el diálogo **Generar PDF** desde la ventana.
+
 La versión no integra biometría, RFID, nómina, vacaciones, sincronización remota ni turnos múltiples.
