@@ -7,7 +7,7 @@ La rúbrica de pre-defensa guía el alcance: interfaz PySide6 navegable con vali
 ## Requisitos
 
 - Windows 10/11 de 64 bits.
-- Python 3.9 o posterior.
+- Python 3.9 o posterior (se recomienda Python 3.13 de 64 bits en Windows).
 - MySQL Server 8.0 en ejecución y una base de datos accesible.
 - Visual Studio Code (entorno de edición recomendado).
 
@@ -27,7 +27,7 @@ La hora laboral y la tolerancia no se precargan con valores inventados. Al inici
 Abre PowerShell en esta carpeta:
 
 ```powershell
-py -3 -m venv .venv
+py -3.13 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 pip install -r requirements.txt
@@ -37,6 +37,8 @@ python main.py
 ```
 
 Completa `.env` antes de ejecutar. En VS Code puedes seleccionar `.venv` con **Python: Select Interpreter** y ejecutar `main.py` desde el depurador. Si PowerShell bloquea la activación del entorno, ejecuta los comandos usando `.venv\Scripts\python.exe` directamente.
+
+Si aparece un error que apunta a un Python que ya desinstalaste (por ejemplo, el Python incluido con Visual Studio), el entorno virtual conserva esa ruta antigua. Cierra VS Code y renombra `.venv` para guardarlo como respaldo; crea uno nuevo con `py -3.13 -m venv .venv`, activa el entorno y reinstala `requirements.txt`. Después selecciona el intérprete de `.venv` desde **Python: Select Interpreter**. No es necesario reinstalar VS Code.
 
 La pantalla principal intenta conectar a MySQL. Si no puede, BODETIME muestra un aviso y mantiene la ventana abierta para que se pueda corregir la conexión; las consultas y escrituras mostrarán el error correspondiente. No hay registros de trabajadores de demostración ni se usa SQLite.
 
