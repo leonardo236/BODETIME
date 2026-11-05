@@ -40,7 +40,7 @@ Completa `.env` antes de ejecutar. En VS Code puedes seleccionar `.venv` con **P
 
 Si aparece un error que apunta a un Python que ya desinstalaste (por ejemplo, el Python incluido con Visual Studio), el entorno virtual conserva esa ruta antigua. Cierra VS Code y renombra `.venv` para guardarlo como respaldo; crea uno nuevo con `py -3.13 -m venv .venv`, activa el entorno y reinstala `requirements.txt`. Después selecciona el intérprete de `.venv` desde **Python: Select Interpreter**. No es necesario reinstalar VS Code.
 
-La pantalla principal intenta conectar a MySQL. Si no puede, BODETIME muestra un aviso y mantiene la ventana abierta para que se pueda corregir la conexión; las consultas y escrituras mostrarán el error correspondiente. No hay registros de trabajadores de demostración ni se usa SQLite.
+La pantalla principal intenta conectar a MySQL al abrirse. Si el servidor no responde, BODETIME mantiene la ventana abierta y reintenta cada 15 segundos; también puedes usar **Reintentar conexión**. Si el servicio `MySQL80` está detenido, inícialo desde **Servicios** de Windows. Al volver a estar disponible, BODETIME actualizará las pantallas sin reiniciarse. El servidor debe estar en ejecución para consultar o guardar datos. No hay registros de trabajadores de demostración ni se usa SQLite.
 
 ## Funciones
 

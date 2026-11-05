@@ -198,6 +198,9 @@ class MainWindow(QMainWindow):
         self.clock_timer = QTimer(self)
         self.clock_timer.timeout.connect(self._update_clock)
         self.clock_timer.start(1000)
+        self.database_retry_timer = QTimer(self)
+        self.database_retry_timer.setInterval(15000)
+        self.database_retry_timer.timeout.connect(self._auto_retry_database)
         self._update_clock()
         if database_error:
             self.set_database_error(database_error)
@@ -242,8 +245,13 @@ class MainWindow(QMainWindow):
 
     def set_database_error(self, message: str) -> None:
         self.database_error = message
-        self.banner_text.setText(self._connection_advice(message))
+        self.banner_text.setText(
+            self._connection_advice(message)
+            + " BODETIME volverá a intentar conectarse automáticamente cada 15 segundos."
+        )
         self.banner.setVisible(True)
+        if hasattr(self, "database_retry_timer") and not self.database_retry_timer.isActive():
+            self.database_retry_timer.start()
         if hasattr(self, "dashboard_connection"):
             self.dashboard_connection.setText("●  SIN CONEXIÓN A MYSQL")
             self.dashboard_connection.setStyleSheet("color:#8A591D; background:#FFF0D5; border-radius:8px; padding:8px 12px;")
@@ -251,6 +259,8 @@ class MainWindow(QMainWindow):
 
     def clear_database_error(self) -> None:
         self.database_error = None
+        if hasattr(self, "database_retry_timer"):
+            self.database_retry_timer.stop()
         self.banner.setVisible(False)
         if hasattr(self, "dashboard_connection"):
             self.dashboard_connection.setText("●  MYSQL CONECTADO")
@@ -291,6 +301,22 @@ class MainWindow(QMainWindow):
             detail = self._error_detail(exc)
             self.set_database_error(detail)
             QMessageBox.warning(self, "MySQL no disponible", self._connection_advice(detail) + "\n\nDetalle técnico: " + detail)
+
+    def _auto_retry_database(self) -> None:
+        if not self.database_error:
+            self.database_retry_timer.stop()
+            return
+        try:
+            self.service.database.initialize()
+        except Exception as exc:
+            self.database_error = self._error_detail(exc)
+            self.banner_text.setText(
+                self._connection_advice(self.database_error)
+                + " BODETIME volverá a intentar conectarse automáticamente cada 15 segundos."
+            )
+            return
+        self.clear_database_error()
+        self.refresh_all()
 
     def _guard(self, callback, *args):
         try:
