@@ -34,6 +34,7 @@ class Database:
     def session(self) -> Iterator[Session]:
         session = self._sessions()
         try:
+            # begin confirma al terminar; si hay una excepción, SQLAlchemy revierte.
             with session.begin():
                 yield session
         finally:

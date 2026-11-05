@@ -54,18 +54,36 @@ La pantalla principal intenta conectar a MySQL. Si no puede, BODETIME muestra un
 ## Arquitectura
 
 ```text
-PySide6 (bodetime/ui.py)
-        ↓
-Servicio y reglas de negocio (bodetime/services.py)
-        ↓
-SQLAlchemy ORM + sesiones transaccionales (bodetime/models.py, database.py)
-        ↓
+Usuario
+  ↓
+Interfaz PySide6 (bodetime/ui.py)
+  ↓
+Servicios y reglas (bodetime/services.py)
+  ↓
+SQLAlchemy: modelos y sesiones (bodetime/models.py, bodetime/database.py)
+  ↓
 MySQL 8 (schema.sql)
 
-Servicio de asistencia → consulta ORM → ReportLab (bodetime/reports.py) → PDF
+Consulta de asistencia → ReportLab (bodetime/reports.py) → archivo PDF
 ```
 
-Cada escritura se ejecuta dentro de una transacción SQLAlchemy; una excepción revierte la operación. Las claves de conexión se leen desde `.env` y ese archivo está excluido de Git. La tabla `asistencias` conserva la relación con `trabajadores` mediante clave foránea y una restricción única por trabajador y fecha. Por ese criterio la versión admite un turno por día.
+En palabras sencillas: `main.py` abre la ventana. La pantalla recoge lo que hace el usuario y se lo pide a un servicio. El servicio valida la acción y usa una sesión de SQLAlchemy para leer o guardar en MySQL. Si una escritura falla, la transacción se revierte. Para un reporte, el servicio consulta las filas y ReportLab las presenta en una tabla PDF.
+
+Así se reparten las tareas del código:
+
+- `main.py`: inicia la aplicación y muestra la ventana.
+- `bodetime/ui.py`: dibuja las cinco pantallas y presenta mensajes.
+- `bodetime/services.py`: aplica las reglas de trabajadores y asistencia.
+- `bodetime/models.py`: describe las tablas como clases de Python.
+- `bodetime/database.py`: configura la conexión, las sesiones y las transacciones.
+- `bodetime/reports.py`: crea el PDF con la información consultada.
+- `schema.sql`: contiene la estructura inicial de MySQL.
+
+Las claves de conexión se leen desde `.env`, que está excluido de Git. La tabla `asistencias` relaciona cada registro con un trabajador y limita la versión actual a una asistencia por persona y fecha.
+
+## Material para la defensa
+
+En [`Material_Defensa`](Material_Defensa/) están la presentación de siete diapositivas y la guía breve para practicar la explicación y la demostración. La plantilla JUDC original y la rúbrica se conservan sin cambios.
 
 ## Pruebas
 

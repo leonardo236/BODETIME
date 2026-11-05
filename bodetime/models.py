@@ -11,6 +11,7 @@ class Base(DeclarativeBase):
     pass
 
 
+# Worker representa la tabla de personas que pueden marcar asistencia.
 class Worker(Base):
     __tablename__ = "trabajadores"
     __table_args__ = (
@@ -35,6 +36,7 @@ class Worker(Base):
 
 
 class Attendance(Base):
+    # La base permite un registro por trabajador y fecha.
     __tablename__ = "asistencias"
     __table_args__ = (
         UniqueConstraint("id_trabajador", "fecha", name="uq_asistencia_trabajador_fecha"),

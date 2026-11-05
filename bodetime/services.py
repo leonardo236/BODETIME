@@ -41,6 +41,7 @@ class DashboardSummary:
 
 def is_late(clock_in: time, start_time: time, tolerance_minutes: int) -> bool:
     """Compara horas locales del mismo día; el límite de tolerancia es puntual."""
+    # Se suma la tolerancia al horario y se compara con la hora de entrada.
     threshold = (datetime.combine(date.today(), start_time) + timedelta(minutes=tolerance_minutes)).time()
     return clock_in > threshold
 
@@ -126,6 +127,7 @@ class BodeTimeService:
     def mark_entry(self, worker_id: int, now: datetime | None = None) -> Attendance:
         moment = now or datetime.now()
         with self.database.session() as session:
+            # El bloqueo y la restricción UNIQUE evitan dos entradas para el mismo día.
             worker = session.scalar(select(Worker).where(Worker.id == worker_id).with_for_update())
             if worker is None or not worker.active:
                 raise ValidationError("Selecciona un trabajador activo.")

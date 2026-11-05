@@ -21,6 +21,7 @@ INK = colors.HexColor("#2E4035")
 
 
 def generate_attendance_pdf(path: str | Path, rows: list[AttendanceRow], start: date, end: date, worker_label: str = "Todos") -> Path:
+    """Crea el PDF con las filas que el servicio consultó en MySQL."""
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
     styles = getSampleStyleSheet()
@@ -35,6 +36,7 @@ def generate_attendance_pdf(path: str | Path, rows: list[AttendanceRow], start: 
         data.append([row.day.strftime("%d/%m/%Y"), row.code, Paragraph(escape(row.full_name), body),
                      row.clock_in.strftime("%H:%M"), row.clock_out.strftime("%H:%M") if row.clock_out else "Pendiente",
                      "Tarde" if row.late else "A tiempo"])
+    # TableStyle da color al encabezado y alterna el fondo de las filas.
     table = Table(data, colWidths=[1.0 * inch, 1.0 * inch, 4.5 * inch, 1.05 * inch, 1.05 * inch, 1.3 * inch], repeatRows=1, hAlign="LEFT")
     table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), FOREST), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),

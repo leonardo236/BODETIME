@@ -9,6 +9,7 @@ from sqlalchemy import URL
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+# Las claves se leen del .env local; ese archivo no se publica en GitHub.
 load_dotenv(PROJECT_ROOT / ".env")
 
 

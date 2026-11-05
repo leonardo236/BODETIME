@@ -111,6 +111,7 @@ def _put(table: QTableWidget, row: int, col: int, value: object, user_data: int 
 
 
 class MainWindow(QMainWindow):
+    """Muestra las pantallas y delega las reglas de datos al servicio."""
     PAGES = ["Inicio", "Trabajadores", "Asistencia", "Reportes", "Configuración"]
 
     def __init__(self, service: BodeTimeService, database_error: str | None = None):

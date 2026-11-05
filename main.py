@@ -12,6 +12,7 @@ def main() -> int:
     database = Database(get_settings())
     database_error = None
     try:
+        # Si MySQL no responde, la ventana muestra el aviso y sigue disponible.
         database.initialize()
     except Exception as exc:
         database_error = str(exc.orig) if getattr(exc, "orig", None) else str(exc)
