@@ -1,5 +1,7 @@
 #define AppName "BODETIME"
-#define AppVersion "1.0.0"
+#ifndef AppVersion
+  #define AppVersion "1.0.0"
+#endif
 
 [Setup]
 AppId={{7A89B4B1-4E2F-4D59-9627-21570A0C2026}
@@ -13,6 +15,7 @@ OutputBaseFilename=BODETIME-Setup
 Compression=lzma2
 SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64
+ArchitecturesAllowed=x64
 PrivilegesRequired=admin
 WizardStyle=modern
 DisableProgramGroupPage=yes

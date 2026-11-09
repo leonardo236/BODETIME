@@ -27,10 +27,21 @@ jobs:
         run: >-
           pyinstaller --noconfirm --clean --windowed --onedir
           --name BODETIME --add-data "schema.sql;." main.py
-      - name: Install Inno Setup
-        run: choco install innosetup --version=6.7.4 --yes --no-progress
+      - name: Install Inno Setup from the official release
+        shell: powershell
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP 'innosetup-6.7.4.exe'
+          Invoke-WebRequest 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_4/innosetup-6.7.4.exe' -OutFile $installer
+          $signature = Get-AuthenticodeSignature $installer
+          if ($signature.Status -ne 'Valid') { throw "Firma de Inno Setup no válida: $($signature.Status)" }
+          $process = Start-Process -FilePath $installer -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-','/DIR=C:\Program Files (x86)\Inno Setup 6' -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Inno Setup terminó con código $($process.ExitCode)" }
       - name: Build installer
-        run: '& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer\BODETIME.iss'
+        shell: powershell
+        run: |
+          $version = if ($env:GITHUB_REF_NAME -match '^v(\d+\.\d+\.\d+)$') { $Matches[1] } else { '1.0.1' }
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$version" installer\BODETIME.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC terminó con código $LASTEXITCODE" }
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:

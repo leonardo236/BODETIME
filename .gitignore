@@ -18,6 +18,7 @@ env/
 ENV/
 build/
 dist/
+output/
 
 # Local credentials and private keys
 .env
