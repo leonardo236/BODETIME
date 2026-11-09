@@ -24,6 +24,12 @@ La hora laboral y la tolerancia no se precargan con valores inventados. Al inici
 
 ## Instalación y ejecución en Windows
 
+### Instalador para usuarios
+
+Al publicar una etiqueta `v*` en GitHub, Actions ejecuta las pruebas, empaqueta la aplicación y adjunta `BODETIME-Setup.exe` a la publicación. También se puede iniciar manualmente desde la pestaña **Actions**. El instalador crea accesos directos y prepara `%APPDATA%\BODETIME\.env` a partir de la plantilla. La guía que instala explica cómo conectar MySQL.
+
+**Requisito:** este instalador instala BODETIME, pero no instala MySQL Server. Cada computadora debe tener MySQL 8 instalado y en ejecución; la preparación del servidor requiere permisos de administrador y no se debe ocultar ese paso al usuario. No publiques contraseñas reales en `.env` ni en GitHub.
+
 Abre PowerShell en esta carpeta:
 
 ```powershell

@@ -9,8 +9,13 @@ from sqlalchemy import URL
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-# Las claves se leen del .env local; ese archivo no se publica en GitHub.
-load_dotenv(PROJECT_ROOT / ".env")
+# En instalaciones de Windows la configuración vive en AppData; al ejecutar
+# desde el código fuente se mantiene el .env de la carpeta del proyecto.
+APP_CONFIG_DIR = Path(os.getenv("APPDATA", str(PROJECT_ROOT))) / "BODETIME"
+APP_ENV_FILE = APP_CONFIG_DIR / ".env"
+SOURCE_ENV_FILE = PROJECT_ROOT / ".env"
+ENV_FILE = APP_ENV_FILE if APP_ENV_FILE.exists() else SOURCE_ENV_FILE
+load_dotenv(ENV_FILE)
 
 
 @dataclass(frozen=True)
