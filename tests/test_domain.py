@@ -6,6 +6,7 @@ from bodetime.reports import generate_attendance_pdf
 from bodetime.models import Attendance, Worker
 from bodetime.services import AttendanceRow, BodeTimeService, ValidationError, is_late
 from bodetime.ui import MainWindow
+from bodetime.setup_wizard import is_valid_database_name
 
 
 def test_worker_code_is_trimmed_and_uppercased():
@@ -58,3 +59,9 @@ def test_mysql_credential_advice_does_not_expose_password():
     assert "DB_USER" in advice
     assert "DB_PASSWORD" in advice
     assert "leo123456789" not in advice
+
+
+def test_setup_wizard_only_accepts_safe_mysql_database_identifiers():
+    assert is_valid_database_name("bodetime_2026")
+    assert not is_valid_database_name("bode-time")
+    assert not is_valid_database_name("bode time; DROP DATABASE bodetime")

@@ -27,13 +27,13 @@ Name: "desktopicon"; Description: "Crear acceso directo en el escritorio"; Flags
 [Files]
 Source: "..\dist\BODETIME\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\schema.sql"; DestDir: "{app}\database"; Flags: ignoreversion
-Source: "..\.env.example"; DestDir: "{userappdata}\BODETIME"; DestName: ".env"; Flags: onlyifdoesntexist
 Source: "..\README-INSTALADOR.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\BODETIME"; Filename: "{app}\BODETIME.exe"
 Name: "{autodesktop}\BODETIME"; Filename: "{app}\BODETIME.exe"; Tasks: desktopicon
+Name: "{autoprograms}\Configurar conexión de MySQL"; Filename: "{app}\BODETIME.exe"; Parameters: "--configurar-base"
 Name: "{autoprograms}\Guía de configuración BODETIME"; Filename: "{app}\README-INSTALADOR.txt"
 
 [Run]
-Filename: "{app}\README-INSTALADOR.txt"; Description: "Abrir guía rápida para conectar MySQL"; Flags: postinstall shellexec skipifsilent
+Filename: "{app}\BODETIME.exe"; Parameters: "--configurar-base"; Description: "Configurar MySQL ahora (recomendado)"; Flags: postinstall runasoriginaluser skipifsilent

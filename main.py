@@ -2,6 +2,11 @@ from __future__ import annotations
 
 import sys
 
+if "--configurar-base" in sys.argv:
+    from bodetime.setup_wizard import run_setup_wizard
+
+    sys.exit(run_setup_wizard())
+
 from bodetime.config import get_settings
 from bodetime.database import Database
 from bodetime.services import BodeTimeService

@@ -1,28 +1,27 @@
 BODETIME - instalación rápida
 ============================
 
-ANTES DE INSTALAR BODETIME
---------------------------
+REQUISITO
+---------
 MySQL Server 8 debe estar instalado y en ejecución. BODETIME no incluye el
-servidor MySQL. MySQL Workbench es opcional y se usa aquí para preparar la base.
+servidor MySQL. No necesitas MySQL Workbench ni usar comandos para configurar
+la base de BODETIME.
 
 INSTALACIÓN
 -----------
-1. Ejecuta BODETIME-Setup.exe y sigue el asistente. El instalador crea accesos
-   directos y una configuración inicial en %APPDATA%\BODETIME\.env.
-2. Abre MySQL Workbench y conecta a tu servidor local como administrador.
-3. Abre el archivo database\schema.sql dentro de la carpeta de instalación
-   de BODETIME y ejecútalo completo (icono del rayo). Esto crea la base,
-   las tablas y el usuario limitado que usa la aplicación.
-4. Abre BODETIME desde el menú Inicio. En Configuración, guarda el horario
-   y tolerancia reales antes de registrar asistencias.
+1. Ejecuta BODETIME-Setup.exe y sigue el asistente.
+2. Deja marcada la opción “Configurar MySQL ahora”. Se abrirá el asistente.
+3. Escribe el usuario y la contraseña administradora de tu MySQL local.
+   Esa contraseña solo se usa para crear la base y no se guarda.
+4. Pulsa “Probar y configurar”. BODETIME crea la base, las tablas, un usuario
+   limitado con contraseña aleatoria y su configuración local protegida en
+   %APPDATA%\BODETIME\.env.
+5. Cuando aparezca la confirmación, abre BODETIME desde el menú Inicio.
+   En Configuración, registra el horario y tolerancia aprobados por la bodega.
 
-Si MySQL Workbench no está instalado, abre CMD y ejecuta (ajusta la ruta si
-instalaste MySQL en otra carpeta):
-"C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -u root -p < "C:\Program Files\BODETIME\database\schema.sql"
+Si cancelas el asistente, puedes abrir “Configurar conexión de MySQL” desde el
+menú Inicio más tarde. Si MySQL aún no está instalado, instala MySQL Server 8
+y vuelve a abrir ese acceso directo.
 
-La plantilla y schema.sql usan una contraseña de demostración coincidente.
-Para uso real, cambia la contraseña en MySQL y también en
-%APPDATA%\BODETIME\.env (DB_PASSWORD). No publiques ni compartas ese archivo.
-
-No compartas el archivo .env: puede contener la contraseña de MySQL.
+No compartas el archivo %APPDATA%\BODETIME\.env: contiene la contraseña local
+aleatoria que usa BODETIME para acceder a su base de datos.
