@@ -1,4 +1,10 @@
-## Novedades de BODETIME 1.0.6
+## Novedades de BODETIME 1.0.7
+
+- El botón de configuración ahora busca una versión nueva y, si existe, ofrece descargar e instalarla desde BODETIME.
+- Inicio animado con el nombre y el símbolo de BODETIME mientras se prepara la conexión con MySQL.
+- Calendario flotante con estilos Cristal claro y Blanco clásico, navegación por mes y acceso a Hoy.
+- Reloj local con hora, segundos y fecha en español.
+- Preferencia para activar o desactivar las animaciones de interfaz.
 
 - Cualquier usuario puede agregar cargos de bodega; la lista se comparte con las instalaciones conectadas a la misma base MySQL.
 - Se quitó la contraseña y el permiso de administrador propios de BODETIME; cualquier usuario puede borrar trabajadores. La confirmación informa cuántas asistencias se eliminarán.

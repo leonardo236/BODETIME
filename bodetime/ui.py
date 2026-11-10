@@ -4,19 +4,21 @@ import os
 from datetime import date, timedelta
 from pathlib import Path
 
-from PySide6.QtCore import QRegularExpression, QSettings, Qt, QTime, QTimer, QUrl
+from PySide6.QtCore import QDate, QRegularExpression, QSettings, Qt, QTime, QTimer, QUrl
 from PySide6.QtGui import QColor, QDesktopServices, QRegularExpressionValidator
 from PySide6.QtWidgets import (
-    QAbstractItemView, QApplication, QCheckBox, QColorDialog, QComboBox, QDateEdit,
-    QDialog, QFileDialog, QFrame, QGraphicsOpacityEffect, QHBoxLayout, QInputDialog,
+    QAbstractItemView, QApplication, QCheckBox, QColorDialog, QComboBox,
+    QDialog, QFileDialog, QFrame, QGraphicsDropShadowEffect, QGraphicsOpacityEffect, QHBoxLayout, QInputDialog,
     QLabel, QLineEdit, QListWidget, QMainWindow, QMessageBox, QProgressBar,
     QPushButton, QProgressDialog, QScrollArea, QSpinBox, QStackedWidget, QTableWidget,
     QTableWidgetItem, QTimeEdit, QVBoxLayout, QWidget,
 )
 
-from .animations import SmoothTween, frame_interval_ms
+from .animations import SmoothTween
 from .appearance import ACCENT_PRESETS, build_stylesheet
+from .calendar import GlassDateEdit
 from .reports import generate_attendance_pdf
+from .splash import SplashScreen
 from .services import BodeTimeService, ValidationError, AttendanceRow
 from .update_tasks import InstallerDownloadTask, ReleaseCheckTask
 from .updater import ReleaseInfo
@@ -33,6 +35,11 @@ def _label(text: str, object_name: str | None = None) -> QLabel:
 def _panel() -> QWidget:
     widget = QWidget()
     widget.setObjectName("panel")
+    shadow = QGraphicsDropShadowEffect(widget)
+    shadow.setBlurRadius(24)
+    shadow.setOffset(0, 7)
+    shadow.setColor(QColor(20, 45, 48, 22))
+    widget.setGraphicsEffect(shadow)
     return widget
 
 
@@ -160,15 +167,17 @@ class MainWindow(QMainWindow):
         saved_accent = QColor(str(self.preferences.value("appearance/accent", "#16877B")))
         self.accent_color = saved_accent.name() if saved_accent.isValid() else "#16877B"
         self.motion_enabled = self.preferences.value("appearance/animations", True, type=bool)
-        self._frame_interval = 8
+        self.calendar_style = str(self.preferences.value("appearance/calendar", "glass"))
+        if self.calendar_style not in {"glass", "classic"}:
+            self.calendar_style = "glass"
+        self.date_pickers: list[GlassDateEdit] = []
         self._active_tweens: set[SmoothTween] = set()
         self._widget_tweens: dict[QWidget, tuple[SmoothTween, QGraphicsOpacityEffect]] = {}
         self._progress_tween: SmoothTween | None = None
         self._page_effect: QGraphicsOpacityEffect | None = None
         self._intro_started = False
         self._intro_finished = False
-        self._transition_widget: QWidget | None = None
-        self._refresh_frame_interval()
+        self._install_after_update_check = False
         app = QApplication.instance()
         if app:
             app.setStyleSheet(build_stylesheet(self.theme_mode, self.accent_color))
@@ -311,9 +320,6 @@ class MainWindow(QMainWindow):
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
-        if not getattr(self, "_screen_signal_connected", False) and self.windowHandle():
-            self.windowHandle().screenChanged.connect(self._refresh_frame_interval)
-            self._screen_signal_connected = True
         if not self._intro_started:
             self._intro_started = True
             if self.motion_enabled:
@@ -321,11 +327,6 @@ class MainWindow(QMainWindow):
             else:
                 self.setWindowOpacity(1.0)
                 self._finish_intro()
-
-    def _refresh_frame_interval(self, screen=None) -> None:
-        screen = screen or (self.windowHandle().screen() if self.windowHandle() else QApplication.primaryScreen())
-        rate = screen.refreshRate() if screen else None
-        self._frame_interval = frame_interval_ms(rate)
 
     def _apply_appearance(self) -> None:
         app = QApplication.instance()
@@ -336,6 +337,8 @@ class MainWindow(QMainWindow):
         self.preferences.sync()
         if hasattr(self, "accent_preview"):
             self.accent_preview.setText(f"Acento actual · {self.accent_color.upper()}")
+        for picker in self.date_pickers:
+            picker.set_calendar_style(self.accent_color, self.calendar_style, self.motion_enabled)
 
     def _on_theme_changed(self, _index: int) -> None:
         selected = self.theme_selector.currentData()
@@ -373,6 +376,8 @@ class MainWindow(QMainWindow):
         self.motion_enabled = enabled
         self.preferences.setValue("appearance/animations", enabled)
         self.preferences.sync()
+        for picker in self.date_pickers:
+            picker.set_calendar_style(self.accent_color, self.calendar_style, enabled)
         if enabled:
             return
         for tween in list(self._active_tweens):
@@ -383,6 +388,18 @@ class MainWindow(QMainWindow):
         self._widget_tweens.clear()
         self.setWindowOpacity(1.0)
         self._finish_intro()
+        self.preferences.setValue("appearance/animations", False)
+        self.preferences.sync()
+
+    def _on_calendar_style_changed(self, _index: int) -> None:
+        style = self.calendar_style_selector.currentData()
+        if style not in {"glass", "classic"}:
+            return
+        self.calendar_style = style
+        self.preferences.setValue("appearance/calendar", style)
+        self.preferences.sync()
+        for picker in self.date_pickers:
+            picker.set_calendar_style(self.accent_color, style, self.motion_enabled)
 
     def _start_tween(self, setter, start: float, end: float, duration: int, on_finished=None) -> SmoothTween | None:
         if not self.motion_enabled:
@@ -390,7 +407,7 @@ class MainWindow(QMainWindow):
             if on_finished:
                 on_finished()
             return None
-        tween = SmoothTween(setter, start, end, duration, self._frame_interval, self)
+        tween = SmoothTween(setter, start, end, duration, self)
         self._active_tweens.add(tween)
         tween.finished.connect(lambda current=tween: self._active_tweens.discard(current))
         if on_finished:
@@ -447,10 +464,11 @@ class MainWindow(QMainWindow):
         if tween:
             self._widget_tweens[widget] = (tween, effect)
 
-    def check_for_updates(self, manual: bool = False) -> None:
+    def check_for_updates(self, manual: bool = False, install_if_available: bool = False) -> None:
+        self._install_after_update_check = self._install_after_update_check or install_if_available
         if self._release_check_task and self._release_check_task.isRunning():
             if manual:
-                self.update_status.setText("La búsqueda de actualizaciones ya está en curso…")
+                self.update_status.setText("La búsqueda sigue en curso; te preguntaré si deseas instalarla.")
             return
         if manual:
             self.update_status.setText("Buscando una versión nueva…")
@@ -467,6 +485,7 @@ class MainWindow(QMainWindow):
         self.check_updates_button.setEnabled(True)
         self.latest_release = release
         if release is None:
+            self._install_after_update_check = False
             self.update_banner.setVisible(False)
             self.update_status.setText(f"BODETIME {APP_VERSION} está actualizado.")
             if manual:
@@ -479,8 +498,13 @@ class MainWindow(QMainWindow):
         self.update_banner.setVisible(True)
         self._fade_widget(self.update_banner, 220)
         self.update_status.setText(f"Versión {release.version} disponible (actual: {APP_VERSION}).")
+        install_now = self._install_after_update_check
+        self._install_after_update_check = False
+        if install_now:
+            QTimer.singleShot(250, self.start_update_download)
 
     def _update_check_failed(self, message: str, manual: bool) -> None:
+        self._install_after_update_check = False
         self.check_updates_button.setEnabled(True)
         self.update_status.setText("No se pudo comprobar si hay una versión nueva.")
         if manual:
@@ -658,8 +682,13 @@ class MainWindow(QMainWindow):
 
     def _update_clock(self) -> None:
         if hasattr(self, "hero_clock"):
-            self.hero_clock.setText(QTime.currentTime().toString("HH:mm"))
-            self.hero_date.setText(date.today().strftime("%d  ·  %m  ·  %Y"))
+            now = QTime.currentTime()
+            today = date.today()
+            weekdays = ("LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO", "DOMINGO")
+            months = ("ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE")
+            self.hero_clock.setText(now.toString("HH:mm"))
+            self.hero_seconds.setText(now.toString("ss"))
+            self.hero_date.setText(f"{weekdays[today.weekday()]}  ·  {today.day} {months[today.month - 1]}")
 
     def _build_dashboard(self) -> None:
         page = QWidget()
@@ -675,22 +704,36 @@ class MainWindow(QMainWindow):
         layout.addLayout(heading)
 
         hero = QFrame(); hero.setObjectName("dashboardHero")
+        hero_shadow = QGraphicsDropShadowEffect(hero)
+        hero_shadow.setBlurRadius(30); hero_shadow.setOffset(0, 10); hero_shadow.setColor(QColor(20, 45, 48, 24))
+        hero.setGraphicsEffect(hero_shadow)
         hero_layout = QHBoxLayout(hero); hero_layout.setContentsMargins(24, 15, 22, 15); hero_layout.setSpacing(18)
         hero_copy = QVBoxLayout(); hero_copy.setSpacing(4)
         hero_copy.addWidget(_label("CONTROL DE ASISTENCIA", "eyebrow"))
         hero_copy.addWidget(_label("Jornada laboral", "heroTitle"))
         hero_copy.addWidget(_label("Entradas, salidas y puntualidad del personal", "heroCaption"))
         hero_layout.addLayout(hero_copy, 1)
-        clock_panel = QFrame(); clock_panel.setObjectName("heroClock"); clock_panel.setMinimumWidth(166)
-        clock_layout = QVBoxLayout(clock_panel); clock_layout.setContentsMargins(12, 7, 8, 7); clock_layout.setSpacing(0)
+        clock_panel = QFrame(); clock_panel.setObjectName("heroClock"); clock_panel.setMinimumWidth(238)
+        clock_shadow = QGraphicsDropShadowEffect(clock_panel)
+        clock_shadow.setBlurRadius(22); clock_shadow.setOffset(0, 6); clock_shadow.setColor(QColor(20, 45, 48, 20))
+        clock_panel.setGraphicsEffect(clock_shadow)
+        clock_layout = QVBoxLayout(clock_panel); clock_layout.setContentsMargins(16, 9, 16, 9); clock_layout.setSpacing(0)
         clock_layout.addWidget(_label("HORA LOCAL · LEÓN", "clockCaption"), 0, Qt.AlignmentFlag.AlignRight)
-        self.hero_clock = _label("--:--", "clockValue"); self.hero_clock.setAlignment(Qt.AlignmentFlag.AlignRight)
+        clock_row = QHBoxLayout(); clock_row.setSpacing(4)
+        clock_row.addStretch(1)
+        self.hero_clock = _label("--:--", "clockValue"); self.hero_clock.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.hero_seconds = _label("00", "clockSeconds"); self.hero_seconds.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        clock_row.addWidget(self.hero_clock); clock_row.addWidget(self.hero_seconds, 0, Qt.AlignmentFlag.AlignBottom)
+        clock_layout.addLayout(clock_row)
         self.hero_date = _label("", "clockCaption"); self.hero_date.setAlignment(Qt.AlignmentFlag.AlignRight)
-        clock_layout.addWidget(self.hero_clock); clock_layout.addWidget(self.hero_date)
+        clock_layout.addWidget(self.hero_date)
         hero_layout.addWidget(clock_panel)
         layout.addWidget(hero)
 
         metric_panel = QFrame(); metric_panel.setObjectName("metricPanel")
+        metric_shadow = QGraphicsDropShadowEffect(metric_panel)
+        metric_shadow.setBlurRadius(22); metric_shadow.setOffset(0, 7); metric_shadow.setColor(QColor(20, 45, 48, 18))
+        metric_panel.setGraphicsEffect(metric_shadow)
         metrics = QHBoxLayout(metric_panel); metrics.setContentsMargins(0, 0, 0, 0); metrics.setSpacing(0)
         self.dashboard_values: list[QLabel] = []
         metric_specs = [
@@ -933,6 +976,16 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Operación completada", message)
             self.clear_worker_form(); self.refresh_workers(); self.refresh_dashboard(); self.refresh_attendance_workers(); self.refresh_report_workers()
 
+    def _date_picker(self, selected: date) -> GlassDateEdit:
+        picker = GlassDateEdit(
+            QDate(selected.year, selected.month, selected.day),
+            accent=self.accent_color,
+            calendar_style=self.calendar_style,
+            animated=self.motion_enabled,
+        )
+        self.date_pickers.append(picker)
+        return picker
+
     def add_worker_role(self) -> None:
         name, accepted = QInputDialog.getText(
             self, "Agregar cargo", "Nombre del nuevo cargo de bodega:", QLineEdit.EchoMode.Normal,
@@ -993,8 +1046,8 @@ class MainWindow(QMainWindow):
         box.addWidget(entry); box.addWidget(exit_button)
         layout.addWidget(panel)
         filters = QHBoxLayout(); filters.addWidget(_label("Historial de asistencia", "sectionTitle")); filters.addStretch(1)
-        self.att_start = QDateEdit(); self.att_start.setCalendarPopup(True); self.att_start.setDisplayFormat("dd/MM/yyyy"); self.att_start.setDate(date.today() - timedelta(days=30))
-        self.att_end = QDateEdit(); self.att_end.setCalendarPopup(True); self.att_end.setDisplayFormat("dd/MM/yyyy"); self.att_end.setDate(date.today())
+        self.att_start = self._date_picker(date.today() - timedelta(days=30))
+        self.att_end = self._date_picker(date.today())
         self.att_filter_worker = QComboBox()
         self.att_filter_worker.addItem("Todos los trabajadores", None)
         apply = QPushButton("Filtrar"); apply.clicked.connect(self.refresh_attendance_history)
@@ -1064,8 +1117,8 @@ class MainWindow(QMainWindow):
         panel = _panel(); box = QVBoxLayout(panel); box.setContentsMargins(20, 20, 20, 20)
         box.addWidget(_label("Criterios del reporte", "sectionTitle"))
         filters = QHBoxLayout()
-        self.report_start = QDateEdit(); self.report_start.setCalendarPopup(True); self.report_start.setDisplayFormat("dd/MM/yyyy"); self.report_start.setDate(date.today() - timedelta(days=30))
-        self.report_end = QDateEdit(); self.report_end.setCalendarPopup(True); self.report_end.setDisplayFormat("dd/MM/yyyy"); self.report_end.setDate(date.today())
+        self.report_start = self._date_picker(date.today() - timedelta(days=30))
+        self.report_end = self._date_picker(date.today())
         self.report_worker = QComboBox(); self.report_worker.addItem("Todos los trabajadores", None); self.report_worker.setMinimumWidth(280)
         for text, widget in [("Desde", self.report_start), ("Hasta", self.report_end), ("Trabajador", self.report_worker)]:
             group = QVBoxLayout(); group.addWidget(_label(text, "muted")); group.addWidget(widget); filters.addLayout(group, 1)
@@ -1155,6 +1208,20 @@ class MainWindow(QMainWindow):
         self.animations_toggle.toggled.connect(self._on_animations_toggled)
         appearance_row.addWidget(self.animations_toggle, 0, Qt.AlignmentFlag.AlignVCenter)
         appearance_box.addLayout(appearance_row)
+        calendar_row = QHBoxLayout()
+        calendar_group = QVBoxLayout()
+        calendar_group.addWidget(_label("Estilo del calendario", "muted"))
+        self.calendar_style_selector = QComboBox()
+        self.calendar_style_selector.addItem("Cristal claro", "glass")
+        self.calendar_style_selector.addItem("Blanco clásico", "classic")
+        self.calendar_style_selector.setCurrentIndex(max(0, self.calendar_style_selector.findData(self.calendar_style)))
+        self.calendar_style_selector.currentIndexChanged.connect(self._on_calendar_style_changed)
+        calendar_group.addWidget(self.calendar_style_selector)
+        calendar_row.addLayout(calendar_group)
+        calendar_note = _label("El calendario se abre como una tarjeta flotante y ofrece un acceso rápido a Hoy.", "muted")
+        calendar_note.setWordWrap(True)
+        calendar_row.addWidget(calendar_note, 1, Qt.AlignmentFlag.AlignVCenter)
+        appearance_box.addLayout(calendar_row)
         preview_row = QHBoxLayout()
         self.accent_preview = _label(f"Acento actual · {self.accent_color.upper()}", "accentPreview")
         self.accent_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -1164,7 +1231,7 @@ class MainWindow(QMainWindow):
         preview_note.setWordWrap(True)
         preview_row.addWidget(preview_note, 1)
         appearance_box.addLayout(preview_row)
-        animation_note = _label("Ritmo sincronizado con la pantalla, hasta 120 Hz cuando el monitor lo permite.", "muted")
+        animation_note = _label("Las transiciones son breves, se pueden desactivar y usan el motor de animación de Qt.", "muted")
         animation_note.setWordWrap(True)
         appearance_box.addWidget(animation_note)
         layout.addWidget(appearance_panel)
@@ -1209,8 +1276,10 @@ class MainWindow(QMainWindow):
         update_row = QHBoxLayout()
         self.update_status = _label(f"Versión instalada: {APP_VERSION}", "muted")
         update_row.addWidget(self.update_status, 1)
-        self.check_updates_button = QPushButton("Buscar actualización")
-        self.check_updates_button.clicked.connect(lambda: self.check_for_updates(manual=True))
+        self.check_updates_button = QPushButton("Buscar e instalar")
+        self.check_updates_button.setObjectName("primary")
+        self.check_updates_button.setToolTip("Busca una versión nueva y te pregunta antes de descargarla")
+        self.check_updates_button.clicked.connect(lambda: self.check_for_updates(manual=True, install_if_available=True))
         update_row.addWidget(self.check_updates_button)
         update_box.addLayout(update_row)
         layout.addWidget(update_panel)
@@ -1237,11 +1306,18 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Configuración guardada", "El horario y la tolerancia se guardaron correctamente.")
 
 
-def run_app(service: BodeTimeService, database_error: str | None = None) -> int:
-    app = QApplication.instance() or QApplication([])
+def run_app(
+    service: BodeTimeService,
+    database_error: str | None = None,
+    splash: SplashScreen | None = None,
+    application: QApplication | None = None,
+) -> int:
+    app = application or QApplication.instance() or QApplication([])
     app.setOrganizationName("BODETIME")
     app.setApplicationName("BODETIME")
     app.setStyle("Fusion")
     window = MainWindow(service, database_error)
     window.show()
+    if splash is not None:
+        QTimer.singleShot(140, splash.fade_out)
     return app.exec()

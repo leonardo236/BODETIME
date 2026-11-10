@@ -30,7 +30,7 @@ Al publicar una etiqueta `v*` en GitHub, Actions ejecuta las pruebas, empaqueta 
 
 **Requisito:** cada computadora debe tener MySQL Server 8 instalado y en ejecución. El asistente de BODETIME configura la base y la cuenta de aplicación, pero no instala el servidor MySQL. La contraseña de la cuenta de administración de MySQL solo se usa durante esa configuración; no se guarda. No publiques `.env` ni credenciales en GitHub.
 
-La aplicación comprueba si hay una versión más reciente al iniciar y cada seis horas. Cuando hay una, muestra el aviso dentro de BODETIME; **Actualizar ahora** descarga el instalador de GitHub, comprueba su SHA-256 y solicita confirmación antes de abrirlo. Windows puede pedir permiso de administrador. La base de datos y el archivo de configuración del usuario no forman parte de la actualización, y el asistente inicial de MySQL no vuelve a abrirse si esa configuración ya existe. Las versiones anteriores a la 1.0.4 deben instalar esta versión manualmente una primera vez; después recibirán los avisos dentro de la aplicación.
+La aplicación comprueba si hay una versión más reciente al iniciar y cada seis horas. En **Configuración**, **Buscar e instalar** busca una versión y, si hay una nueva, permite instalarla desde BODETIME después de confirmar. La descarga comprueba su SHA-256 antes de abrir el instalador. Windows puede pedir permiso de administrador. La base de datos y el archivo de configuración del usuario no forman parte de la actualización, y el asistente inicial de MySQL no vuelve a abrirse si esa configuración ya existe. Las versiones anteriores a la 1.0.4 deben instalar esta versión manualmente una primera vez; después recibirán los avisos dentro de la aplicación.
 
 Todos los usuarios pueden agregar cargos y eliminar trabajadores. Antes de borrar, BODETIME muestra una confirmación que indica cuántas asistencias históricas también se eliminarán.
 
@@ -59,10 +59,10 @@ La pantalla principal intenta conectar a MySQL al abrirse. Si el servidor no res
 - **Asistencia:** entrada y salida con reloj del sistema; historial por rango de fechas y trabajador; rechazo de entradas diarias duplicadas, salida sin entrada y hora de salida no posterior a la entrada.
 - **Tardanzas:** se marcan cuando la entrada supera la hora de inicio más la tolerancia. Se evalúan con la configuración vigente al registrar la entrada.
 - **Reportes:** consulta de MySQL con fechas y trabajador opcional. El botón **Generar PDF** usa ReportLab (`Table`, `TableStyle`), pide ruta y permite abrir el archivo creado. Si no hay resultados, no crea un PDF vacío.
-- **Configuración:** tema claro/oscuro, acento de color predeterminado o personalizado, animaciones, hora de entrada y tolerancia. La apariencia se guarda para la cuenta de Windows; el horario se guarda en MySQL.
+- **Configuración:** tema claro/oscuro, acento de color predeterminado o personalizado, animaciones, estilo del calendario (cristal claro o blanco clásico), hora de entrada y tolerancia. La apariencia se guarda para la cuenta de Windows; el horario se guarda en MySQL.
 - **Actualizaciones:** comprobación de versiones publicadas, aviso integrado, descarga verificada y apertura del instalador de Windows.
 - **Cargos de bodega:** Almacenista, Auxiliar de bodega, Bodeguero, Despachador de bodega, Encargado de bodega, Montacarguista y Recepcionista de mercancía; cualquier usuario puede agregar opciones propias.
-- **Animaciones:** transiciones breves con temporizador preciso, sincronizadas con la frecuencia de la pantalla y limitadas a un máximo de 120 Hz cuando el equipo lo permite. Se pueden desactivar desde Configuración.
+- **Apariencia:** inicio animado con la marca BODETIME, reloj local con segundos y tarjeta de fecha, calendario flotante con aparición suave y estilos cristal claro o blanco clásico. Las transiciones son breves y se pueden desactivar desde Configuración.
 
 ## Arquitectura
 
@@ -91,7 +91,9 @@ Así se reparten las tareas del código:
 - `bodetime/database.py`: configura la conexión, las sesiones y las transacciones.
 - `bodetime/reports.py`: crea el PDF con la información consultada.
 - `bodetime/appearance.py`: crea la paleta clara/oscura y los colores de acento.
-- `bodetime/animations.py`: anima cambios de pantalla y valores según la frecuencia disponible.
+- `bodetime/animations.py`: ejecuta transiciones con el motor de animación de Qt.
+- `bodetime/calendar.py`: contiene el selector de fecha y su calendario flotante.
+- `bodetime/splash.py`: presenta la marca de BODETIME mientras se inicia la conexión.
 - `schema.sql`: contiene la estructura inicial de MySQL.
 
 Las claves de conexión se leen desde `.env`, que está excluido de Git. La tabla `asistencias` relaciona cada registro con un trabajador y limita la versión actual a una asistencia por persona y fecha.
@@ -108,7 +110,7 @@ Activa el entorno e invoca:
 pytest -q
 ```
 
-Las pruebas unitarias cubren validaciones, reglas de asistencia, estilos claro/oscuro, colores de selección, ritmo de animación y generación de PDF con datos sintéticos. La integración con MySQL se verifica por separado y usa registros temporales que se eliminan al terminar.
+Las pruebas unitarias cubren validaciones, reglas de asistencia, estilos claro/oscuro, selector de calendario, transiciones y generación de PDF con datos sintéticos. Las pruebas de interfaz usan Qt en modo sin ventana.
 
 ## Esquema y configuración
 
@@ -116,16 +118,18 @@ Las pruebas unitarias cubren validaciones, reglas de asistencia, estilos claro/o
 
 Variables soportadas en `.env`: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_CHARSET`, `DB_CONNECT_TIMEOUT` y `DB_CREATE_SCHEMA`.
 
-## Alcance de la verificación local
+## Verificación local
 
-En esta actualización, `pytest -q` reportó **34 pruebas aprobadas**, `compileall` terminó correctamente y `git diff --check` no encontró errores de formato. También se verificó la conexión real a MySQL con registros sintéticos temporales:
+La actualización de apariencia se verificó en Windows con estas comprobaciones:
 
-- La integración de esta versión creó un cargo y trabajador ficticios, asoció una asistencia temporal, consultó y eliminó el trabajador con su historial, y retiró el cargo. Todas las filas de prueba se limpiaron sin leer ni modificar datos reales.
-- Una comprobación PySide6 aislada confirmó el selector sin texto libre, las preferencias persistentes de tema y color, los controles de animación y el selector con estilos. No se hizo una sesión manual completa con información real en la ventana.
-- `git diff --check` terminó sin errores y se confirmó que `.env` y los entornos locales están excluidos de Git.
+- `pytest -q`: 37 pruebas aprobadas, incluyendo selector y estilos del calendario y el flujo de búsqueda/instalación simulado con metadatos de una publicación.
+- `compileall` y `git diff --check`: completados sin errores.
+- MySQL: conexión de solo lectura comprobada con `SELECT 1`; no se consultaron ni modificaron datos de trabajadores durante esa comprobación.
+- Prueba manual de interfaz: BODETIME abrió con MySQL, mostró el panel y permitió navegar a Configuración y Asistencia. Se abrió el calendario desde el filtro.
+- La descarga e instalación completa de una versión nueva se verificará cuando GitHub Actions publique el instalador de la versión 1.0.7. La prueba de interfaz simuló una versión disponible y comprobó que se inicie el flujo de descarga tras la búsqueda.
 
 El esquema y la interfaz se contrastaron con los cinco criterios de la rúbrica de pre-defensa. La plantilla JUDC aporta la estructura de exposición (introducción, objetivos, metodología, resultados y discusión, conclusiones), no criterios funcionales adicionales. Usa la configuración laboral y los datos autorizados por la bodega para la demostración.
 
-La generación del PDF con filas leídas de MySQL se verificó en la prueba de integración; no se comprobó manualmente el diálogo **Generar PDF** desde la ventana.
+La generación del PDF con filas leídas de MySQL se probó anteriormente con registros temporales sintéticos; no se comprobó manualmente el diálogo **Generar PDF** durante esta actualización.
 
 La versión no integra biometría, RFID, nómina, vacaciones, sincronización remota ni turnos múltiples.
