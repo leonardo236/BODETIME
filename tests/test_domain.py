@@ -49,6 +49,23 @@ def test_worker_rejects_values_that_exceed_database_column_lengths():
         BodeTimeService._clean_worker("EMP-1", "A" * 81, "Pérez", "", "")
 
 
+def test_worker_cannot_be_saved_without_a_catalog_cargo():
+    with pytest.raises(ValidationError, match="cargo"):
+        BodeTimeService._clean_worker("EMP-1", "Ana", "Pérez", "", "")
+
+
+def test_custom_role_names_reject_markup_and_allow_warehouse_job_titles():
+    assert BodeTimeService._clean_role_name("Control de inventario") == "Control de inventario"
+    assert BodeTimeService._clean_role_name("Auxiliar (turno 2)") == "Auxiliar (turno 2)"
+    with pytest.raises(ValidationError, match="cargo"):
+        BodeTimeService._clean_role_name("Bodega<script>")
+
+
+def test_default_warehouse_catalog_contains_common_positions():
+    roles = {role.casefold() for role in BodeTimeService.DEFAULT_WAREHOUSE_ROLES}
+    assert {"bodeguero", "almacenista", "montacarguista", "despachador de bodega"}.issubset(roles)
+
+
 def test_lateness_uses_configured_grace_period_inclusively():
     assert not is_late(time(8, 10), time(8, 0), 10)
     assert is_late(time(8, 10, 1), time(8, 0), 10)

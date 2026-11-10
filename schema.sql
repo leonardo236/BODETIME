@@ -23,6 +23,16 @@ CREATE TABLE IF NOT EXISTS trabajadores (
   CONSTRAINT uq_trabajadores_codigo UNIQUE (codigo),
   INDEX ix_trabajadores_activo_nombre (activo, apellidos, nombres)
 ) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS cargos_personal (
+  id_cargo INT NOT NULL AUTO_INCREMENT,
+  nombre VARCHAR(80) NOT NULL,
+  activo BOOLEAN NOT NULL DEFAULT TRUE,
+  creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id_cargo),
+  CONSTRAINT uq_cargos_personal_nombre UNIQUE (nombre)
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS asistencias (
   id_asistencia INT NOT NULL AUTO_INCREMENT,
   id_trabajador INT NOT NULL,

@@ -35,6 +35,17 @@ class Worker(Base):
         return f"{self.first_name} {self.last_name}".strip()
 
 
+class JobRole(Base):
+    """Cargo adicional aprobado por administración en esta base BODETIME."""
+    __tablename__ = "cargos_personal"
+    __table_args__ = (UniqueConstraint("nombre", name="uq_cargos_personal_nombre"),)
+
+    id: Mapped[int] = mapped_column("id_cargo", Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column("nombre", String(80), nullable=False)
+    active: Mapped[bool] = mapped_column("activo", Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column("creado_en", DateTime, nullable=False, server_default=func.current_timestamp())
+
+
 class Attendance(Base):
     # La base permite un registro por trabajador y fecha.
     __tablename__ = "asistencias"

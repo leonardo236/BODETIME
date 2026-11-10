@@ -32,6 +32,8 @@ Al publicar una etiqueta `v*` en GitHub, Actions ejecuta las pruebas, empaqueta 
 
 La aplicación comprueba si hay una versión más reciente al iniciar y cada seis horas. Cuando hay una, muestra el aviso dentro de BODETIME; **Actualizar ahora** descarga el instalador de GitHub, comprueba su SHA-256 y solicita confirmación antes de abrirlo. Windows puede pedir permiso de administrador. La base de datos y el archivo de configuración del usuario no forman parte de la actualización, y el asistente inicial de MySQL no vuelve a abrirse si esa configuración ya existe. Las versiones anteriores a la 1.0.4 deben instalar esta versión manualmente una primera vez; después recibirán los avisos dentro de la aplicación.
 
+La primera vez que se administran cargos o se elimina un trabajador, un administrador de Windows configura una clave de BODETIME de al menos 12 caracteres. Solo se guarda un hash PBKDF2 en el `.env` privado local. Después, la clave se pide para agregar cargos personalizados o eliminar trabajadores. Si no hay administrador configurado, abre BODETIME con **Ejecutar como administrador** para inicializarlo.
+
 Abre PowerShell en esta carpeta:
 
 ```powershell
@@ -53,12 +55,13 @@ La pantalla principal intenta conectar a MySQL al abrirse. Si el servidor no res
 ## Funciones
 
 - **Inicio:** recuento de trabajadores activos, asistencias del día, tardanzas y turnos abiertos; listado de marcajes del día.
-- **Trabajadores:** alta, consulta, edición de la fila seleccionada y desactivación/reactivación con confirmación. Valida código, nombres, apellidos, cargo y formato del teléfono; conserva asistencias al desactivar.
+- **Trabajadores:** alta, consulta, edición de la fila seleccionada y desactivación/reactivación. El cargo se elige de un catálogo con puestos comunes de bodega; el administrador autenticado agrega cargos personalizados desde Configuración. El administrador puede eliminar definitivamente un trabajador con una segunda confirmación; también se borran sus asistencias históricas.
 - **Asistencia:** entrada y salida con reloj del sistema; historial por rango de fechas y trabajador; rechazo de entradas diarias duplicadas, salida sin entrada y hora de salida no posterior a la entrada.
 - **Tardanzas:** se marcan cuando la entrada supera la hora de inicio más la tolerancia. Se evalúan con la configuración vigente al registrar la entrada.
 - **Reportes:** consulta de MySQL con fechas y trabajador opcional. El botón **Generar PDF** usa ReportLab (`Table`, `TableStyle`), pide ruta y permite abrir el archivo creado. Si no hay resultados, no crea un PDF vacío.
 - **Configuración:** hora de entrada y tolerancia, guardadas en MySQL.
 - **Actualizaciones:** comprobación de versiones publicadas, aviso integrado, descarga verificada y apertura del instalador de Windows.
+- **Cargos de bodega:** Almacenista, Auxiliar de bodega, Bodeguero, Despachador de bodega, Encargado de bodega, Montacarguista y Recepcionista de mercancía; se pueden añadir cargos propios con permisos de administrador.
 
 ## Arquitectura
 
@@ -106,16 +109,17 @@ Las pruebas unitarias cubren las reglas de dominio y los formatos de datos de tr
 
 ## Esquema y configuración
 
-`schema.sql` define `trabajadores`, `asistencias` y `configuracion_horario`, con claves, unicidad, integridad referencial e índices. SQLAlchemy puede crear estas tablas al iniciar, pero no crea el servidor ni la base de datos: la base y el usuario deben prepararse primero.
+`schema.sql` define `trabajadores`, `cargos_personal`, `asistencias` y `configuracion_horario`, con claves, unicidad, integridad referencial e índices. SQLAlchemy puede crear estas tablas al iniciar, pero no crea el servidor ni la base de datos: la base y el usuario deben prepararse primero. Si `DB_CREATE_SCHEMA=false`, ejecuta `schema.sql` en la base existente para crear `cargos_personal` antes de iniciar esta versión.
 
 Variables soportadas en `.env`: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_CHARSET`, `DB_CONNECT_TIMEOUT` y `DB_CREATE_SCHEMA`.
 
 ## Alcance de la verificación local
 
-En esta actualización (9 de noviembre de 2026), `pytest -q` reportó **26 pruebas aprobadas**, `compileall` terminó correctamente y `git diff --check` no encontró errores de formato. La conexión real a MySQL no se volvió a verificar como parte de esta actualización. En una revisión local anterior, el 3 de noviembre de 2026:
+En esta actualización, `pytest -q` reportó **32 pruebas aprobadas**, `compileall` terminó correctamente y `git diff --check` no encontró errores de formato. También se verificó la conexión real a MySQL con registros sintéticos temporales:
 
 - La consulta de conexión SQLAlchemy/PyMySQL y la aplicación pudieron leer la base MySQL. La ventana PySide6 quedó abierta y el panel confirmó el estado **MySQL conectado**.
-- Una verificación de integración temporal comprobó alta, lectura, actualización, código duplicado, desactivación, entradas y salidas válidas, rechazo de marcajes inválidos o duplicados, historial y generación ReportLab con filas recuperadas de MySQL. Los registros temporales y el PDF se eliminaron y la configuración de horario previa se restauró. No se incluyeron datos personales en el repositorio.
+- La integración de esta versión comprobó crear un cargo personalizado y un trabajador ficticio, asociar una asistencia temporal, consultar el trabajador y su historial, borrar definitivamente el trabajador y la asistencia, y retirar el cargo. Los datos de prueba se limpiaron; no se consultó ni se modificó información real de trabajadores.
+- La interfaz PySide6 de esta versión no se verificó manualmente en una ventana completa. Las reglas de validación se probaron con la suite y la integración confirmó las operaciones correspondientes en MySQL.
 - `git diff --check` terminó sin errores y se confirmó que `.env` y los entornos locales están excluidos de Git.
 
 El esquema y la interfaz se contrastaron con los cinco criterios de la rúbrica de pre-defensa. La plantilla JUDC aporta la estructura de exposición (introducción, objetivos, metodología, resultados y discusión, conclusiones), no criterios funcionales adicionales. Usa la configuración laboral y los datos autorizados por la bodega para la demostración.

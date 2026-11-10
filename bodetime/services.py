@@ -5,12 +5,13 @@ from datetime import date, datetime, time, timedelta
 import re
 import unicodedata
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .database import Database
-from .models import Attendance, WorkSchedule, Worker
+from .admin_auth import verify_admin_password
+from .models import Attendance, JobRole, WorkSchedule, Worker
 
 
 class ValidationError(ValueError):
@@ -49,8 +50,99 @@ def is_late(clock_in: time, start_time: time, tolerance_minutes: int) -> bool:
 
 
 class BodeTimeService:
+    DEFAULT_WAREHOUSE_ROLES = (
+        "Almacenista",
+        "Auxiliar de bodega",
+        "Bodeguero",
+        "Despachador de bodega",
+        "Encargado de bodega",
+        "Montacarguista",
+        "Recepcionista de mercancía",
+    )
+
     def __init__(self, database: Database):
         self.database = database
+
+    @staticmethod
+    def _clean_role_name(name: str) -> str:
+        cleaned = " ".join(unicodedata.normalize("NFC", name).split())
+        if not cleaned or len(cleaned) > 80 or not re.fullmatch(r"[\w .,'’/&():-]+", cleaned, flags=re.UNICODE):
+            raise ValidationError("El cargo admite letras, números y separadores sencillos; máximo 80 caracteres.")
+        return cleaned
+
+    def list_custom_roles(self) -> list[str]:
+        with self.database.session() as session:
+            roles = session.scalars(select(JobRole).where(JobRole.active.is_(True)).order_by(JobRole.name))
+            return [role.name for role in roles]
+
+    def list_roles(self) -> list[str]:
+        custom = self.list_custom_roles()
+        default_names = {role.casefold() for role in self.DEFAULT_WAREHOUSE_ROLES}
+        return list(self.DEFAULT_WAREHOUSE_ROLES) + [role for role in custom if role.casefold() not in default_names]
+
+    def _require_existing_role(self, session, role_name: str) -> str:
+        normalized = self._clean_role_name(role_name)
+        for default in self.DEFAULT_WAREHOUSE_ROLES:
+            if normalized.casefold() == default.casefold():
+                return default
+        for role in session.scalars(select(JobRole).where(JobRole.active.is_(True))):
+            if normalized.casefold() == role.name.casefold():
+                return role.name
+        raise ValidationError("Selecciona un cargo del catálogo. Los cargos nuevos los registra el administrador.")
+
+    def add_custom_role(self, name: str, admin_password: str) -> str:
+        if not verify_admin_password(admin_password):
+            raise ValidationError("La contraseña de administrador no es correcta o todavía no está configurada.")
+        role_name = self._clean_role_name(name)
+        if any(role_name.casefold() == default.casefold() for default in self.DEFAULT_WAREHOUSE_ROLES):
+            raise ValidationError("Ese cargo ya está incluido en el catálogo de bodega.")
+        with self.database.session() as session:
+            if any(role_name.casefold() == role.name.casefold() for role in session.scalars(select(JobRole))):
+                raise ValidationError("Ya existe un cargo con ese nombre.")
+            role = JobRole(name=role_name, active=True)
+            session.add(role)
+            try:
+                session.flush()
+            except IntegrityError as exc:
+                raise ValidationError("Ya existe un cargo con ese nombre.") from exc
+            return role.name
+
+    def remove_custom_role(self, name: str, admin_password: str) -> None:
+        if not verify_admin_password(admin_password):
+            raise ValidationError("La contraseña de administrador no es correcta.")
+        role_name = self._clean_role_name(name)
+        if any(role_name.casefold() == default.casefold() for default in self.DEFAULT_WAREHOUSE_ROLES):
+            raise ValidationError("Los cargos incluidos por BODETIME no se pueden eliminar.")
+        with self.database.session() as session:
+            role = next((item for item in session.scalars(select(JobRole)) if item.name.casefold() == role_name.casefold()), None)
+            if role is None:
+                raise ValidationError("El cargo seleccionado ya no existe.")
+            assigned = session.scalar(select(func.count()).select_from(Worker).where(Worker.role == role.name)) or 0
+            if assigned:
+                raise ValidationError(f"No se puede borrar: {assigned} trabajador(es) todavía tienen ese cargo.")
+            session.delete(role)
+
+    def worker_delete_info(self, worker_id: int) -> tuple[str, int]:
+        with self.database.session() as session:
+            worker = session.get(Worker, worker_id)
+            if worker is None:
+                raise ValidationError("El trabajador seleccionado ya no existe.")
+            count = session.scalar(select(func.count()).select_from(Attendance).where(Attendance.worker_id == worker_id)) or 0
+            return worker.full_name, count
+
+    def delete_worker(self, worker_id: int, admin_password: str) -> int:
+        if not verify_admin_password(admin_password):
+            raise ValidationError("La contraseña de administrador no es correcta.")
+        with self.database.session() as session:
+            worker = session.scalar(select(Worker).where(Worker.id == worker_id).with_for_update())
+            if worker is None:
+                raise ValidationError("El trabajador seleccionado ya no existe.")
+            deleted_attendances = session.scalar(
+                select(func.count()).select_from(Attendance).where(Attendance.worker_id == worker_id)
+            ) or 0
+            session.execute(delete(Attendance).where(Attendance.worker_id == worker_id))
+            session.delete(worker)
+            return int(deleted_attendances)
 
     @staticmethod
     def _clean_worker(code: str, first_name: str, last_name: str, role: str, phone: str) -> dict[str, str | None]:
@@ -94,7 +186,7 @@ class BodeTimeService:
         if len(fields["first_name"]) > 80 or len(fields["last_name"]) > 80:
             raise ValidationError("Los nombres y apellidos no pueden superar 80 caracteres.")
         role = fields["role"]
-        if len(role) > 80 or (role and not re.fullmatch(r"[\w .,'’/&():-]+", role, flags=re.UNICODE)):
+        if not role or len(role) > 80 or not re.fullmatch(r"[\w .,'’/&():-]+", role, flags=re.UNICODE):
             raise ValidationError("El cargo admite hasta 80 caracteres y no puede contener símbolos inválidos.")
         if fields["phone"]:
             digits = re.sub(r"\D", "", fields["phone"])
@@ -117,6 +209,7 @@ class BodeTimeService:
     def create_worker(self, code: str, first_name: str, last_name: str, role: str = "", phone: str = "") -> Worker:
         data = self._clean_worker(code, first_name, last_name, role, phone)
         with self.database.session() as session:
+            data["role"] = self._require_existing_role(session, str(data["role"]))
             if session.scalar(select(Worker.id).where(Worker.code == data["code"])):
                 raise DuplicateCodeError("Ya existe un trabajador con ese código.")
             worker = Worker(**data, active=True)
@@ -131,6 +224,7 @@ class BodeTimeService:
     def update_worker(self, worker_id: int, code: str, first_name: str, last_name: str, role: str = "", phone: str = "") -> Worker:
         data = self._clean_worker(code, first_name, last_name, role, phone)
         with self.database.session() as session:
+            data["role"] = self._require_existing_role(session, str(data["role"]))
             worker = session.get(Worker, worker_id)
             if worker is None:
                 raise ValidationError("El trabajador seleccionado ya no existe.")

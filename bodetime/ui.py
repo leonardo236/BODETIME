@@ -7,12 +7,14 @@ from pathlib import Path
 from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QRegularExpression, Qt, QTime, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices, QRegularExpressionValidator
 from PySide6.QtWidgets import (
-    QAbstractItemView, QApplication, QComboBox, QDateEdit, QFileDialog, QFrame, QGraphicsOpacityEffect,
-    QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox, QProgressBar, QPushButton,
-    QProgressDialog, QSpinBox, QStackedWidget, QTableWidget, QTableWidgetItem, QTimeEdit,
-    QVBoxLayout, QWidget,
+    QAbstractItemView, QApplication, QComboBox, QDateEdit, QDialog, QDialogButtonBox,
+    QFileDialog, QFrame, QGraphicsOpacityEffect, QHBoxLayout, QInputDialog, QLabel,
+    QLineEdit, QListWidget, QMainWindow, QMessageBox, QProgressBar, QPushButton,
+    QProgressDialog, QSpinBox, QStackedWidget, QTableWidget, QTableWidgetItem,
+    QTimeEdit, QVBoxLayout, QWidget,
 )
 
+from .admin_auth import has_admin_password, is_local_system_admin, save_admin_password, verify_admin_password
 from .reports import generate_attendance_pdf
 from .services import BodeTimeService, ValidationError, AttendanceRow
 from .update_tasks import InstallerDownloadTask, ReleaseCheckTask
@@ -118,6 +120,87 @@ def _put(table: QTableWidget, row: int, col: int, value: object, user_data: int 
     if user_data is not None:
         item.setData(Qt.ItemDataRole.UserRole, user_data)
     table.setItem(row, col, item)
+
+
+class JobRolesDialog(QDialog):
+    """Permite al administrador agregar y retirar cargos personalizados."""
+
+    def __init__(self, service: BodeTimeService, admin_password: str, parent=None):
+        super().__init__(parent)
+        self.service = service
+        self.admin_password = admin_password
+        self.setWindowTitle("Administrar cargos de bodega")
+        self.setMinimumWidth(470)
+        layout = QVBoxLayout(self)
+        layout.addWidget(_label("Cargos personalizados", "sectionTitle"))
+        layout.addWidget(_label("Los cargos base de bodega siempre están disponibles. Aquí puedes agregar opciones aprobadas para esta operación.", "muted"))
+        self.roles = QListWidget()
+        layout.addWidget(self.roles, 1)
+        form = QHBoxLayout()
+        self.new_role = QLineEdit()
+        self.new_role.setPlaceholderText("Ej. Control de inventario")
+        self.new_role.setMaxLength(80)
+        self.new_role.setValidator(QRegularExpressionValidator(QRegularExpression(r"[\p{L}\p{M}\p{N}_ .,'’/&():-]{0,80}"), self.new_role))
+        add = QPushButton("Agregar cargo")
+        add.setObjectName("primary")
+        add.clicked.connect(self.add_role)
+        form.addWidget(self.new_role, 1)
+        form.addWidget(add)
+        layout.addLayout(form)
+        buttons = QHBoxLayout()
+        remove = QPushButton("Eliminar cargo seleccionado")
+        remove.setObjectName("danger")
+        remove.clicked.connect(self.remove_role)
+        close = QPushButton("Cerrar")
+        close.clicked.connect(self.accept)
+        buttons.addWidget(remove)
+        buttons.addStretch(1)
+        buttons.addWidget(close)
+        layout.addLayout(buttons)
+        self.refresh()
+
+    def refresh(self) -> None:
+        try:
+            self.roles.clear()
+            for role in self.service.list_custom_roles():
+                self.roles.addItem(role)
+        except Exception as exc:
+            QMessageBox.critical(self, "No se pudieron cargar los cargos", str(exc))
+
+    def add_role(self) -> None:
+        try:
+            self.service.add_custom_role(self.new_role.text(), self.admin_password)
+        except ValidationError as exc:
+            QMessageBox.warning(self, "Cargo no válido", str(exc))
+            return
+        except Exception as exc:
+            QMessageBox.critical(self, "No se pudo guardar el cargo", str(exc))
+            return
+        self.new_role.clear()
+        self.refresh()
+
+    def remove_role(self) -> None:
+        selected = self.roles.currentItem()
+        if selected is None:
+            QMessageBox.warning(self, "Selecciona un cargo", "Elige un cargo personalizado de la lista.")
+            return
+        role = selected.text()
+        answer = QMessageBox.question(
+            self, "Eliminar cargo", f"¿Eliminar el cargo «{role}» del catálogo?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            self.service.remove_custom_role(role, self.admin_password)
+        except ValidationError as exc:
+            QMessageBox.warning(self, "No se puede eliminar", str(exc))
+            return
+        except Exception as exc:
+            QMessageBox.critical(self, "No se pudo eliminar el cargo", str(exc))
+            return
+        self.refresh()
 
 
 class MainWindow(QMainWindow):
@@ -669,8 +752,10 @@ class MainWindow(QMainWindow):
         self.worker_first.setValidator(QRegularExpressionValidator(QRegularExpression(r"[\p{L}\p{M} .’'-]{0,80}"), self.worker_first))
         self.worker_last = QLineEdit(); self.worker_last.setPlaceholderText("Apellidos *"); self.worker_last.setMaxLength(80)
         self.worker_last.setValidator(QRegularExpressionValidator(QRegularExpression(r"[\p{L}\p{M} .’'-]{0,80}"), self.worker_last))
-        self.worker_role = QLineEdit(); self.worker_role.setPlaceholderText("Cargo"); self.worker_role.setMaxLength(80)
-        self.worker_role.setValidator(QRegularExpressionValidator(QRegularExpression(r"[\p{L}\p{M}\p{N}_ .,'’/&():-]{0,80}"), self.worker_role))
+        self.worker_role = QComboBox(); self.worker_role.setMinimumWidth(150); self.worker_role.setEditable(False)
+        self.worker_role.addItem("Selecciona un cargo *", None)
+        for role in BodeTimeService.DEFAULT_WAREHOUSE_ROLES:
+            self.worker_role.addItem(role, role)
         self.worker_phone = QLineEdit(); self.worker_phone.setPlaceholderText("Teléfono"); self.worker_phone.setMaxLength(30)
         self.worker_phone.setValidator(QRegularExpressionValidator(QRegularExpression(r"\+?[0-9 ()-]{0,30}"), self.worker_phone))
         self.worker_phone.setToolTip("Entre 7 y 15 dígitos; puedes usar +, espacios, guiones o paréntesis.")
@@ -682,8 +767,9 @@ class MainWindow(QMainWindow):
         clear = QPushButton("Limpiar"); clear.clicked.connect(self.clear_worker_form)
         self.worker_edit = QPushButton("Editar seleccionado"); self.worker_edit.clicked.connect(self.load_selected_worker)
         self.worker_status = QPushButton("Desactivar"); self.worker_status.setObjectName("danger"); self.worker_status.clicked.connect(self.toggle_selected_worker_status)
-        self.worker_edit.setEnabled(False); self.worker_status.setEnabled(False)
-        for button in [self.worker_save, clear, self.worker_edit, self.worker_status]: buttons.addWidget(button)
+        self.worker_delete = QPushButton("Eliminar definitivo"); self.worker_delete.setObjectName("danger"); self.worker_delete.clicked.connect(self.delete_selected_worker)
+        self.worker_edit.setEnabled(False); self.worker_status.setEnabled(False); self.worker_delete.setEnabled(False)
+        for button in [self.worker_save, clear, self.worker_edit, self.worker_status, self.worker_delete]: buttons.addWidget(button)
         buttons.addStretch(1)
         form.addLayout(buttons)
         layout.addWidget(panel)
@@ -700,11 +786,13 @@ class MainWindow(QMainWindow):
         if self.editing_worker_id is not None and selected_id != self.editing_worker_id:
             # Never save an old worker's form after the user selects a different row.
             self.editing_worker_id = None
-            for field in [self.worker_code, self.worker_first, self.worker_last, self.worker_role, self.worker_phone]:
+            for field in [self.worker_code, self.worker_first, self.worker_last, self.worker_phone]:
                 field.clear()
+            self.worker_role.setCurrentIndex(0)
         self.worker_save.setText("Guardar cambios" if self.editing_worker_id is not None else "Guardar trabajador")
         self.worker_edit.setEnabled(row >= 0)
         self.worker_status.setEnabled(row >= 0)
+        self.worker_delete.setEnabled(row >= 0)
         if row >= 0:
             active = self.workers_table.item(row, 5).text() == "Activo"
             self.worker_status.setText("Desactivar" if active else "Reactivar")
@@ -714,6 +802,7 @@ class MainWindow(QMainWindow):
 
     def refresh_workers(self, silent: bool = False) -> None:
         try:
+            self.refresh_worker_roles()
             workers = self.service.list_workers()
             self.workers_table.setRowCount(0)
             for worker in workers:
@@ -724,6 +813,17 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             self.set_database_error(self._error_detail(exc))
 
+    def refresh_worker_roles(self) -> None:
+        selected_role = self.worker_role.currentData() or ""
+        self.worker_role.blockSignals(True)
+        self.worker_role.clear()
+        self.worker_role.addItem("Selecciona un cargo *", None)
+        for role in self.service.list_roles():
+            self.worker_role.addItem(role, role)
+        index = self.worker_role.findData(selected_role) if selected_role else 0
+        self.worker_role.setCurrentIndex(max(index, 0))
+        self.worker_role.blockSignals(False)
+
     def save_worker(self) -> None:
         if self.editing_worker_id is not None:
             row = self.workers_table.currentRow()
@@ -732,7 +832,7 @@ class MainWindow(QMainWindow):
                 self.clear_worker_form()
                 QMessageBox.warning(self, "Selección cambió", "Vuelve a cargar el trabajador que deseas editar antes de guardar.")
                 return
-        values = (self.worker_code.text(), self.worker_first.text(), self.worker_last.text(), self.worker_role.text(), self.worker_phone.text())
+        values = (self.worker_code.text(), self.worker_first.text(), self.worker_last.text(), self.worker_role.currentData() or "", self.worker_phone.text())
         if self.editing_worker_id is None:
             worker = self._guard(self.service.create_worker, *values)
             message = "El trabajador se registró correctamente."
@@ -744,7 +844,8 @@ class MainWindow(QMainWindow):
             self.clear_worker_form(); self.refresh_workers(); self.refresh_dashboard(); self.refresh_attendance_workers(); self.refresh_report_workers()
 
     def clear_worker_form(self) -> None:
-        for field in [self.worker_code, self.worker_first, self.worker_last, self.worker_role, self.worker_phone]: field.clear()
+        for field in [self.worker_code, self.worker_first, self.worker_last, self.worker_phone]: field.clear()
+        self.worker_role.setCurrentIndex(0)
         self.editing_worker_id = None
         self.worker_save.setText("Guardar trabajador")
         self.workers_table.clearSelection()
@@ -758,7 +859,11 @@ class MainWindow(QMainWindow):
         if worker:
             self.editing_worker_id = worker.id
             self.worker_code.setText(worker.code); self.worker_first.setText(worker.first_name); self.worker_last.setText(worker.last_name)
-            self.worker_role.setText(worker.role); self.worker_phone.setText(worker.phone or "")
+            role_index = self.worker_role.findData(worker.role)
+            self.worker_role.setCurrentIndex(role_index if role_index >= 0 else 0)
+            if role_index < 0:
+                QMessageBox.warning(self, "Cargo fuera del catálogo", f"El cargo «{worker.role}» ya no está autorizado. Selecciona un cargo disponible antes de guardar.")
+            self.worker_phone.setText(worker.phone or "")
             self.worker_save.setText("Guardar cambios")
 
     def toggle_selected_worker_status(self) -> None:
@@ -783,6 +888,97 @@ class MainWindow(QMainWindow):
         if self._guard(operation, worker_id):
             QMessageBox.information(self, "Operación completada", message)
             self.clear_worker_form(); self.refresh_workers(); self.refresh_dashboard(); self.refresh_attendance_workers(); self.refresh_report_workers()
+
+    def _admin_password(self) -> str | None:
+        if not has_admin_password():
+            if not is_local_system_admin():
+                QMessageBox.warning(
+                    self, "Se necesita un administrador de Windows",
+                    "Todavía no hay una clave administradora de BODETIME. Cierra la aplicación y ábrela una vez con «Ejecutar como administrador» para crearla.",
+                )
+                return None
+            QMessageBox.information(
+                self, "Configura el administrador",
+                "Esta instalación todavía no tiene administrador de BODETIME. La primera persona responsable creará una clave privada para administrar cargos y eliminar trabajadores.",
+            )
+            password, accepted = QInputDialog.getText(
+                self, "Crear clave administradora", "Nueva clave (mínimo 12 caracteres):", QLineEdit.EchoMode.Password,
+            )
+            if not accepted:
+                return None
+            confirmation, confirmed = QInputDialog.getText(
+                self, "Confirmar clave", "Repite la clave administradora:", QLineEdit.EchoMode.Password,
+            )
+            if not confirmed:
+                return None
+            if password != confirmation:
+                QMessageBox.warning(self, "Las claves no coinciden", "Escribe la misma clave en ambos campos.")
+                return None
+            try:
+                save_admin_password(password)
+            except (OSError, ValueError) as exc:
+                QMessageBox.critical(self, "No se pudo guardar la clave", str(exc))
+                return None
+            QMessageBox.information(self, "Administrador configurado", "La clave se guardó como hash en la configuración privada de esta computadora.")
+            return password
+
+        password, accepted = QInputDialog.getText(
+            self, "Autorización de administrador", "Clave administradora de BODETIME:", QLineEdit.EchoMode.Password,
+        )
+        if not accepted:
+            return None
+        if not verify_admin_password(password):
+            QMessageBox.warning(self, "Acceso denegado", "La clave administradora no es correcta.")
+            return None
+        return password
+
+    def manage_job_roles(self) -> None:
+        password = self._admin_password()
+        if password is None:
+            return
+        dialog = JobRolesDialog(self.service, password, self)
+        dialog.exec()
+        self.refresh_worker_roles()
+        self.refresh_admin_status()
+
+    def refresh_admin_status(self) -> None:
+        configured = has_admin_password()
+        self.admin_status.setText(
+            "Clave administradora configurada en esta computadora." if configured
+            else "Aún no se configuró la clave. El primer registro requiere una cuenta administradora de Windows."
+        )
+        self.manage_roles_button.setText("Administrar cargos" if configured else "Configurar administrador")
+
+    def delete_selected_worker(self) -> None:
+        row = self.workers_table.currentRow()
+        if row < 0:
+            QMessageBox.warning(self, "Selecciona un trabajador", "Elige el trabajador que deseas eliminar.")
+            return
+        password = self._admin_password()
+        if password is None:
+            return
+        worker_id = self.workers_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        info = self._guard(self.service.worker_delete_info, worker_id)
+        if info is None:
+            return
+        full_name, history_count = info
+        warning = (
+            f"¿Eliminar definitivamente a {full_name}?\n\n"
+            f"También se borrarán {history_count} registro(s) de asistencia. Esta acción no se puede deshacer."
+        )
+        answer = QMessageBox.warning(
+            self, "Eliminar trabajador y su historial", warning,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        deleted_count = self._guard(self.service.delete_worker, worker_id, password)
+        if deleted_count is None:
+            return
+        QMessageBox.information(self, "Trabajador eliminado", f"El registro y {deleted_count} asistencia(s) asociada(s) se eliminaron definitivamente.")
+        self.clear_worker_form()
+        self.refresh_workers(); self.refresh_dashboard(); self.refresh_attendance_workers(); self.refresh_report_workers()
 
     def _build_attendance(self) -> None:
         page = QWidget(); layout = QVBoxLayout(page); layout.setContentsMargins(0, 0, 0, 0)
@@ -926,6 +1122,22 @@ class MainWindow(QMainWindow):
         self.schedule_status = _label("El horario debe confirmarse con la bodega antes de guardar.", "muted")
         box.addWidget(self.schedule_status)
         layout.addWidget(panel)
+        admin_panel = _panel()
+        admin_box = QVBoxLayout(admin_panel)
+        admin_box.setContentsMargins(22, 20, 22, 20)
+        admin_box.setSpacing(10)
+        admin_box.addWidget(_label("Permisos de administración", "sectionTitle"))
+        admin_box.addWidget(_label("El personal elige cargos del catálogo. Solo la clave administradora permite agregar cargos o eliminar trabajadores.", "muted"))
+        admin_row = QHBoxLayout()
+        self.admin_status = _label("", "muted")
+        admin_row.addWidget(self.admin_status, 1)
+        self.manage_roles_button = QPushButton("Administrar cargos")
+        self.manage_roles_button.setObjectName("primary")
+        self.manage_roles_button.clicked.connect(self.manage_job_roles)
+        admin_row.addWidget(self.manage_roles_button)
+        admin_box.addLayout(admin_row)
+        layout.addWidget(admin_panel)
+        self.refresh_admin_status()
         update_panel = _panel()
         update_box = QVBoxLayout(update_panel)
         update_box.setContentsMargins(22, 20, 22, 20)
