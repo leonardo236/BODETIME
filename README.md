@@ -126,7 +126,7 @@ La actualización de apariencia se verificó en Windows con estas comprobaciones
 - `compileall` y `git diff --check`: completados sin errores.
 - MySQL: conexión de solo lectura comprobada con `SELECT 1`; no se consultaron ni modificaron datos de trabajadores durante esa comprobación.
 - Prueba manual de interfaz: BODETIME abrió con MySQL, mostró el panel y permitió navegar a Configuración y Asistencia. Se abrió el calendario desde el filtro.
-- GitHub Actions publicó el instalador de Windows de la versión 1.0.7. El flujo integrado se comprobó con una publicación simulada; la descarga e instalación con confirmación de Windows no se ejecutaron en esta revisión.
+- GitHub Actions aprobó las 38 pruebas y publicó el instalador de Windows de la versión 1.0.8. El flujo integrado se comprobó con una publicación simulada; no se ejecutó ese instalador ni se aceptó UAC durante esta revisión.
 - La corrección visual se verificó en Windows: la superficie y la cuadrícula del calendario pintan un fondo sólido; las esquinas quedan redondeadas y conservan la animación de expansión.
 
 El esquema y la interfaz se contrastaron con los cinco criterios de la rúbrica de pre-defensa. La plantilla JUDC aporta la estructura de exposición (introducción, objetivos, metodología, resultados y discusión, conclusiones), no criterios funcionales adicionales. Usa la configuración laboral y los datos autorizados por la bodega para la demostración.
