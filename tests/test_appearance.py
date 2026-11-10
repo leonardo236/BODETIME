@@ -205,7 +205,7 @@ def test_legacy_default_accent_migrates_and_report_mark_sets_window_icon(tmp_pat
     assert window.accent_color.lower() == "#007aff"
     assert settings.value("appearance/accent") == "#007AFF"
     assert not window.windowIcon().isNull()
-    assert window.brand_mark.accessibleName() == "Isotipo BODETIME en blanco y negro, con B y dial de tiempo"
+    assert window.brand_mark.accessibleName() == "Isotipo BODETIME en blanco y negro, búho vigilante"
     window.close()
     app.processEvents()
 
@@ -231,13 +231,23 @@ def test_schedule_fields_show_values_without_narrow_internal_editors(tmp_path):
     app.processEvents()
 
 
+def test_sidebar_hides_divider_and_internal_control_footer(tmp_path):
+    app = _app()
+    settings = QSettings(str(tmp_path / "sidebar.ini"), QSettings.Format.IniFormat)
+    window = MainWindow(object(), database_error="MySQL sin conexión", preferences=settings)
+    assert not any(child.objectName() == "sideRule" for child in window.sidebar.children())
+    assert not any(label.text().startswith("CONTROL INTERNO") for label in window.sidebar.findChildren(QLabel))
+    window.close()
+    app.processEvents()
+
+
 def test_update_button_flow_starts_download_after_manual_search(tmp_path):
     app = _app()
     settings = QSettings(str(tmp_path / "preferences.ini"), QSettings.Format.IniFormat)
     window = MainWindow(object(), database_error="MySQL sin conexión", preferences=settings)
     release = ReleaseInfo(
-        version="1.1.3",
-        tag="v1.1.3",
+        version="1.1.4",
+        tag="v1.1.4",
         notes_url="https://example.invalid/release",
         installer_url="https://example.invalid/installer.exe",
         installer_sha256="0" * 64,

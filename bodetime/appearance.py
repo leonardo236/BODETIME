@@ -91,7 +91,6 @@ QWidget#brandMark {{ background: transparent; border: 0; }}
 QLabel#brand {{ color: white; font-size: 17pt; font-weight: 750; }}
 QLabel#brandSub {{ color: {colors['sidebar_muted']}; font-size: 8pt; letter-spacing: 1px; }}
 QLabel#navCaption {{ color: {colors['sidebar_muted']}; font-size: 8pt; font-weight: 700; letter-spacing: 1.2px; padding: 22px 12px 7px; }}
-QFrame#sideRule {{ background: {colors['clock_border']}; max-height: 1px; }}
 QPushButton#nav {{ color: {colors['sidebar_text']}; background: transparent; border: 0; border-left: 3px solid transparent; border-radius: 9px; text-align: left; padding: 12px 13px; font-size: 10.5pt; }}
 QPushButton#nav:hover {{ color: white; background: {colors['sidebar_hover']}; }}
 QPushButton#nav:pressed {{ background: {accent}; }}

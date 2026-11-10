@@ -1,4 +1,4 @@
-"""Marca vectorial monocromática de BODETIME."""
+"""Isotipo vectorial de un búho, dibujado en blanco y negro."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from PySide6.QtWidgets import QWidget
 
 
 def draw_bodetime_mark(painter: QPainter, rect: QRectF, accent: str) -> None:
-    """Dibuja un monograma B y un dial de tiempo en blanco y negro."""
+    """Dibuja el búho vigilante de BODETIME con formas simples y alto contraste."""
     painter.save()
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
     painter.translate(rect.topLeft())
@@ -22,27 +22,43 @@ def draw_bodetime_mark(painter: QPainter, rect: QRectF, accent: str) -> None:
     painter.setPen(QPen(ink, 0.022))
     painter.drawPath(tile)
 
-    # La órbita incompleta sugiere un ciclo de jornada en movimiento.
-    dial = QRectF(0.13, 0.13, 0.74, 0.74)
-    orbit = QPainterPath()
-    orbit.arcMoveTo(dial, 43)
-    orbit.arcTo(dial, 43, 292)
-    painter.setPen(QPen(ink, 0.045, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-    painter.drawPath(orbit)
-
-    # Trazo único inspirado en una B y en la curva de un reloj analógico.
-    monogram = QPainterPath()
-    monogram.moveTo(0.34, 0.25)
-    monogram.lineTo(0.34, 0.75)
-    monogram.cubicTo(0.76, 0.78, 0.78, 0.55, 0.42, 0.50)
-    monogram.cubicTo(0.78, 0.45, 0.76, 0.22, 0.34, 0.25)
-    painter.setPen(QPen(ink, 0.057, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
-    painter.drawPath(monogram)
-
-    # El punto de contraste funciona como centro del dial y detalle de marca.
+    # La silueta con dos puntas forma las plumas de la cabeza del búho.
+    owl = QPainterPath()
+    owl.moveTo(0.17, 0.73)
+    owl.cubicTo(0.16, 0.61, 0.17, 0.51, 0.19, 0.42)
+    owl.lineTo(0.16, 0.24)
+    owl.quadTo(0.15, 0.16, 0.25, 0.19)
+    owl.cubicTo(0.37, 0.20, 0.44, 0.25, 0.50, 0.34)
+    owl.cubicTo(0.56, 0.25, 0.63, 0.20, 0.75, 0.19)
+    owl.quadTo(0.85, 0.16, 0.84, 0.24)
+    owl.lineTo(0.81, 0.42)
+    owl.cubicTo(0.83, 0.51, 0.84, 0.61, 0.83, 0.73)
+    owl.cubicTo(0.66, 0.90, 0.34, 0.90, 0.17, 0.73)
+    owl.closeSubpath()
     painter.setPen(Qt.PenStyle.NoPen)
     painter.setBrush(ink)
-    painter.drawEllipse(QPointF(0.77, 0.23), 0.032, 0.032)
+    painter.drawPath(owl)
+
+    # Los ojos blancos y las pupilas negras hacen la figura reconocible incluso pequeña.
+    for center_x in (0.36, 0.64):
+        painter.setBrush(QColor("#FFFFFF"))
+        painter.drawEllipse(QPointF(center_x, 0.47), 0.13, 0.13)
+        painter.setBrush(ink)
+        painter.drawEllipse(QPointF(center_x, 0.47), 0.055, 0.055)
+        painter.setBrush(QColor("#FFFFFF"))
+        painter.drawEllipse(QPointF(center_x - 0.018, 0.45), 0.014, 0.014)
+
+    # Un pico pequeño y dos trazos de pluma completan la marca sin añadir letras.
+    beak = QPainterPath()
+    beak.moveTo(0.46, 0.59)
+    beak.lineTo(0.54, 0.59)
+    beak.lineTo(0.50, 0.69)
+    beak.closeSubpath()
+    painter.setBrush(QColor("#FFFFFF"))
+    painter.drawPath(beak)
+    painter.setPen(QPen(QColor("#FFFFFF"), 0.025, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+    painter.drawLine(QPointF(0.27, 0.68), QPointF(0.42, 0.75))
+    painter.drawLine(QPointF(0.58, 0.75), QPointF(0.73, 0.68))
     painter.restore()
 
 
@@ -54,7 +70,7 @@ class BrandMark(QWidget):
         self.accent = accent
         self.setObjectName(object_name)
         self.setFixedSize(size, size)
-        self.setAccessibleName("Isotipo BODETIME en blanco y negro, con B y dial de tiempo")
+        self.setAccessibleName("Isotipo BODETIME en blanco y negro, búho vigilante")
         self.setToolTip("BODETIME")
 
     def sizeHint(self) -> QSize:

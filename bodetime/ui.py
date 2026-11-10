@@ -228,7 +228,6 @@ class MainWindow(QMainWindow):
         brand_row.addLayout(brand_names); brand_row.addStretch(1)
         side.addLayout(brand_row)
         side.addWidget(_label("ESPACIO DE TRABAJO", "navCaption"))
-        rule = QFrame(); rule.setObjectName("sideRule"); rule.setFrameShape(QFrame.Shape.HLine); side.addWidget(rule)
         self.nav_buttons: list[QPushButton] = []
         for index, page in enumerate(self.PAGES):
             button = QPushButton(f"  {['⌂', '◉', '◷', '▤', '⚙'][index]}      {page}")
@@ -238,7 +237,6 @@ class MainWindow(QMainWindow):
             side.addWidget(button)
             self.nav_buttons.append(button)
         side.addStretch(1)
-        side.addWidget(_label("CONTROL INTERNO\nUNAN · LEÓN", "brandSub"))
 
         self.content = QWidget()
         self.content.setObjectName("content")
