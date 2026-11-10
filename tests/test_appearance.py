@@ -2,8 +2,8 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import QDate, QEventLoop, QSettings, QTimer
-from PySide6.QtWidgets import QApplication, QLabel
+from PySide6.QtCore import QDate, QEventLoop, QSettings, QTimer, Qt
+from PySide6.QtWidgets import QApplication, QLabel, QTableView
 
 from bodetime.animations import SmoothTween
 from bodetime.appearance import build_calendar_stylesheet, build_stylesheet
@@ -74,11 +74,33 @@ def test_calendar_date_field_keeps_qdateedit_api_and_selects_a_date():
 
 
 def test_calendar_style_has_glass_and_classic_light_surfaces():
+    assert "QCalendarWidget#glassCalendar" not in build_stylesheet("dark", "#16877B")
     glass = build_calendar_stylesheet("#4D9469", "glass")
     classic = build_calendar_stylesheet("#4D9469", "classic")
     assert "background: #F7FAF9" in glass
     assert "background: #FFFFFF" in classic
     assert "selection-background-color: #4d9469" in classic
+
+
+def test_calendar_popup_and_date_grid_use_opaque_backgrounds():
+    app = _app()
+    picker = GlassDateEdit(QDate(2026, 11, 9), animated=False)
+    picker.open_calendar()
+    app.processEvents()
+    popover = picker._popover
+    assert popover is not None
+    assert popover.testAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+    assert popover.calendar.testAttribute(Qt.WidgetAttribute.WA_StyledBackground)
+    calendar_view = popover.calendar.findChild(QTableView)
+    assert calendar_view is not None
+    assert calendar_view.viewport().testAttribute(Qt.WidgetAttribute.WA_StyledBackground)
+    assert calendar_view.viewport().testAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent)
+    assert "#fbfcfb" in calendar_view.viewport().styleSheet()
+    picker.set_calendar_style("#3475A8", "classic", False)
+    assert "#ffffff" in calendar_view.viewport().styleSheet()
+    assert calendar_view.viewport().palette().color(calendar_view.viewport().backgroundRole()).name() == "#ffffff"
+    picker.close()
+    assert app is not None
 
 
 def test_update_button_flow_starts_download_after_manual_search(tmp_path):

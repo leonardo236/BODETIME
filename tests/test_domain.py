@@ -105,7 +105,7 @@ def test_mysql_credential_advice_does_not_expose_password():
     advice = MainWindow._connection_advice("1045 Access denied")
     assert "DB_USER" in advice
     assert "DB_PASSWORD" in advice
-    assert "leo123456789" not in advice
+    assert "bodetime-fake-secret-marker" not in advice
 
 
 def test_setup_wizard_only_accepts_safe_mysql_database_identifiers():

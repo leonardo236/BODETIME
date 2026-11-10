@@ -1,4 +1,9 @@
-## Novedades de BODETIME 1.0.7
+## Novedades de BODETIME 1.0.8
+
+- Se corrigió el fondo del calendario flotante en Windows para que no se filtren fragmentos de la pantalla que queda detrás.
+- Se conservan la expansión suave, los estilos Cristal claro y Blanco clásico y la selección de fechas.
+
+La versión 1.0.8 también incluye los cambios de 1.0.7:
 
 - El botón de configuración ahora busca una versión nueva y, si existe, ofrece descargar e instalarla desde BODETIME.
 - Inicio animado con el nombre y el símbolo de BODETIME mientras se prepara la conexión con MySQL.

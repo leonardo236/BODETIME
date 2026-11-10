@@ -146,13 +146,6 @@ QToolButton#calendarTrigger:hover {{ background: {colors['soft_hover']}; border-
 QFrame#calendarSurface {{ background: rgba(255,255,255,244); border: 1px solid rgba(255,255,255,230); border-top: 1px solid white; border-radius: 22px; }}
 QLabel#calendarMonth {{ color: #24333A; font-size: 15pt; font-weight: 700; }}
 QLabel#calendarEyebrow {{ color: {accent}; font-size: 8pt; font-weight: 700; letter-spacing: 1px; }}
-QCalendarWidget#glassCalendar {{ background: transparent; color: #25343A; }}
-QCalendarWidget#glassCalendar QWidget {{ background: transparent; color: #25343A; alternate-background-color: #F7F9F8; }}
-QCalendarWidget#glassCalendar QTableView {{ background: transparent; border: 0; outline: none; selection-background-color: {accent}; selection-color: white; gridline-color: transparent; }}
-QCalendarWidget#glassCalendar QAbstractItemView:enabled {{ color: #26373D; background: transparent; selection-background-color: {accent}; selection-color: white; alternate-background-color: transparent; }}
-QCalendarWidget#glassCalendar QAbstractItemView:item {{ padding: 6px; border-radius: 16px; }}
-QCalendarWidget#glassCalendar QToolButton {{ background: transparent; color: #26373D; border: 0; border-radius: 8px; padding: 5px; }}
-QCalendarWidget#glassCalendar QToolButton:hover {{ background: #EEF3F1; color: {accent}; }}
 """
 
 
@@ -175,9 +168,9 @@ QCalendarWidget#glassCalendar QWidget {{ background-color: #FBFCFB; color: #2634
 QCalendarWidget#glassCalendar QTableView {{ background-color: #FBFCFB; border: 0; outline: none; selection-background-color: {accent}; selection-color: white; gridline-color: transparent; }}
 QCalendarWidget#glassCalendar QAbstractItemView:enabled {{ color: #26343A; background-color: #FBFCFB; selection-background-color: {accent}; selection-color: white; alternate-background-color: #F4F7F5; }}
 QCalendarWidget#glassCalendar QTableView QWidget#qt_scrollarea_viewport {{ background-color: #FBFCFB; }}
-QCalendarWidget#glassCalendar QTableView::item {{ padding: 5px; border-radius: 15px; background-color: #FBFCFB; color: #26343A; }}
-QCalendarWidget#glassCalendar QTableView::item:hover {{ background-color: #EDF3F0; color: #26343A; }}
-QCalendarWidget#glassCalendar QTableView::item:selected {{ background-color: {accent}; color: white; border-radius: 15px; }}
+QCalendarWidget#glassCalendar QTableView::item {{ padding: 5px; border: 0; border-radius: 0; background-color: #FBFCFB; color: #26343A; }}
+QCalendarWidget#glassCalendar QTableView::item:hover {{ background-color: #EDF3F0; color: #26343A; border-radius: 9px; }}
+QCalendarWidget#glassCalendar QTableView::item:selected {{ background-color: {accent}; color: white; border-radius: 9px; }}
 QCalendarWidget#glassCalendar QHeaderView::section {{ background-color: #FBFCFB; color: #75837D; border: 0; padding: 6px; font-weight: 650; }}
 QCalendarWidget#glassCalendar QToolButton {{ background: transparent; color: #34464B; border: 0; border-radius: 8px; padding: 5px; }}
 QCalendarWidget#glassCalendar QToolButton:hover {{ background: #EDF3F0; color: {accent}; }}

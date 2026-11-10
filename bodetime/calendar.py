@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QEasingCurve, QDate, QLocale, QPoint, QRect, Qt, QParallelAnimationGroup, QPropertyAnimation, Signal
+from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import (
     QCalendarWidget,
     QDateEdit,
     QDialog,
     QFrame,
-    QGraphicsDropShadowEffect,
-    QGraphicsOpacityEffect,
     QHBoxLayout,
     QLabel,
     QPushButton,
     QToolButton,
+    QTableView,
     QVBoxLayout,
     QWidget,
     QAbstractSpinBox,
@@ -42,16 +42,17 @@ class CalendarPopover(QDialog):
         self._transition: QParallelAnimationGroup | None = None
         self._closing = False
         self.setObjectName("calendarPopover")
+        # Solo las esquinas exteriores son transparentes; el calendario y su cuadrícula
+        # se pintan con fondos sólidos para que el contenido de atrás no se filtre.
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setAutoFillBackground(False)
         self.setStyleSheet(build_calendar_stylesheet(accent, style))
 
         surface = QFrame(self)
         surface.setObjectName("calendarSurface")
-        shadow = QGraphicsDropShadowEffect(surface)
-        shadow.setBlurRadius(34)
-        shadow.setOffset(0, 12)
-        shadow.setColor(Qt.GlobalColor.black)
-        surface.setGraphicsEffect(shadow)
+        surface.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        surface.setAutoFillBackground(True)
 
         layout = QVBoxLayout(surface)
         layout.setContentsMargins(18, 16, 18, 14)
@@ -86,6 +87,7 @@ class CalendarPopover(QDialog):
         self.calendar.setFirstDayOfWeek(Qt.DayOfWeek.Monday)
         self.calendar.setGridVisible(False)
         self.calendar.setMinimumSize(324, 280)
+        self._apply_calendar_palette()
         self.calendar.currentPageChanged.connect(self._update_month_label)
         self.calendar.clicked.connect(self._select_date)
         self.previous_button.clicked.connect(self.calendar.showPreviousMonth)
@@ -105,10 +107,26 @@ class CalendarPopover(QDialog):
         outer.setContentsMargins(6, 6, 6, 6)
         outer.addWidget(surface)
         self.setFixedSize(376, 414)
-        self._opacity = QGraphicsOpacityEffect(self)
-        self.setGraphicsEffect(self._opacity)
-        self._opacity.setOpacity(1.0)
         self._update_month_label(self.calendar.yearShown(), self.calendar.monthShown())
+
+    def _apply_calendar_palette(self) -> None:
+        """Asegura fondos opacos en el calendario y su tabla interna."""
+        background = QColor("#FBFCFB" if self.calendar_style == "glass" else "#FFFFFF")
+        widgets = [self.calendar]
+        calendar_view = self.calendar.findChild(QTableView)
+        if calendar_view is not None:
+            widgets.extend((calendar_view, calendar_view.viewport()))
+        for widget in widgets:
+            widget.setAutoFillBackground(True)
+            widget.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+            palette = widget.palette()
+            for role in (QPalette.ColorRole.Window, QPalette.ColorRole.Base, QPalette.ColorRole.AlternateBase):
+                palette.setColor(role, background)
+            widget.setPalette(palette)
+        if calendar_view is not None:
+            calendar_view.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
+            calendar_view.viewport().setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
+            calendar_view.viewport().setStyleSheet(f"background-color: {background.name()};")
 
     def _update_month_label(self, year: int, month: int) -> None:
         self.month_label.setText(f"{MONTHS[month - 1].capitalize()} {year}")
@@ -135,7 +153,6 @@ class CalendarPopover(QDialog):
         self.show()
         self.raise_()
         if not self.animated:
-            self._opacity.setOpacity(1.0)
             return
         inset = 0.94
         initial_width, initial_height = round(width * inset), round(height * inset)
@@ -146,20 +163,13 @@ class CalendarPopover(QDialog):
             initial_height,
         )
         self.setGeometry(initial)
-        self._opacity.setOpacity(0.0)
         self._transition = QParallelAnimationGroup(self)
         geometry = QPropertyAnimation(self, b"geometry", self._transition)
         geometry.setDuration(245)
         geometry.setStartValue(initial)
         geometry.setEndValue(target)
         geometry.setEasingCurve(QEasingCurve.Type.OutCubic)
-        opacity = QPropertyAnimation(self._opacity, b"opacity", self._transition)
-        opacity.setDuration(210)
-        opacity.setStartValue(0.0)
-        opacity.setEndValue(1.0)
-        opacity.setEasingCurve(QEasingCurve.Type.OutCubic)
         self._transition.addAnimation(geometry)
-        self._transition.addAnimation(opacity)
         self._transition.start()
 
     def _select_date(self, selected: QDate) -> None:
@@ -193,13 +203,7 @@ class CalendarPopover(QDialog):
         geometry.setStartValue(start)
         geometry.setEndValue(end)
         geometry.setEasingCurve(QEasingCurve.Type.InCubic)
-        opacity = QPropertyAnimation(self._opacity, b"opacity", self._transition)
-        opacity.setDuration(135)
-        opacity.setStartValue(self._opacity.opacity())
-        opacity.setEndValue(0.0)
-        opacity.setEasingCurve(QEasingCurve.Type.InCubic)
         self._transition.addAnimation(geometry)
-        self._transition.addAnimation(opacity)
         self._transition.finished.connect(self.hide)
         self._transition.start()
 
@@ -263,6 +267,7 @@ class GlassDateEdit(QDateEdit):
             self._popover.calendar_style = style
             self._popover.animated = animated
             self._popover.setStyleSheet(build_calendar_stylesheet(accent, style))
+            self._popover._apply_calendar_palette()
 
     def open_calendar(self) -> None:
         if self._popover is None:
@@ -271,4 +276,5 @@ class GlassDateEdit(QDateEdit):
         else:
             self._popover.setStyleSheet(build_calendar_stylesheet(self.accent, self.calendar_style))
             self._popover.animated = self.animated
+            self._popover._apply_calendar_palette()
         self._popover.show_for(self, self.date())
