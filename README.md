@@ -62,7 +62,7 @@ La pantalla principal intenta conectar a MySQL al abrirse. Si el servidor no res
 - **Configuración:** tema claro/oscuro, acento de color predeterminado o personalizado, animaciones, estilo del calendario (cristal claro o blanco clásico), reloj digital o analógico, hora de entrada y tolerancia. La apariencia se guarda para la cuenta de Windows; el horario se guarda en MySQL.
 - **Actualizaciones:** comprobación de versiones publicadas, aviso integrado, descarga verificada y apertura del instalador de Windows.
 - **Cargos de bodega:** Almacenista, Auxiliar de bodega, Bodeguero, Despachador de bodega, Encargado de bodega, Montacarguista y Recepcionista de mercancía; cualquier usuario puede agregar opciones propias.
-- **Apariencia:** isotipo propio con un monograma B y una órbita de tiempo, tipografía general del sistema, superficies claras u oscuras y paneles translúcidos. La pantalla de inicio aparece suavemente; el reloj muestra el estilo elegido, con hora local y fecha; el calendario compacto se alinea con el campo de fecha y adapta su superficie de cristal al tema. En Configuración se puede elegir **Cristal claro** o **Blanco clásico**, cambiar el tema y el acento, y desactivar las animaciones.
+- **Apariencia:** isotipo propio en blanco y negro, con un monograma B y una órbita de tiempo; tipografía general del sistema, superficies claras u oscuras y paneles translúcidos. La pantalla de inicio aparece suavemente; el reloj muestra el estilo elegido, con hora local y fecha; el calendario compacto se alinea con el campo de fecha y adapta su superficie de cristal al tema. En Configuración se puede elegir **Cristal claro** o **Blanco clásico**, cambiar el tema y el acento, y desactivar las animaciones.
 
 ## Arquitectura
 
@@ -92,7 +92,7 @@ Así se reparten las tareas del código:
 - `bodetime/database.py`: configura la conexión, las sesiones y las transacciones.
 - `bodetime/reports.py`: crea el PDF con la información consultada.
 - `bodetime/excel_reports.py`: crea un libro Excel filtrable desde las filas obtenidas del servicio.
-- `bodetime/branding.py`: dibuja el isotipo monograma/dial y el icono de la aplicación con vectores Qt.
+- `bodetime/branding.py`: dibuja el isotipo monocromático monograma/dial y el icono de la aplicación con vectores Qt.
 - `bodetime/appearance.py`: crea la paleta clara/oscura y los colores de acento.
 - `bodetime/animations.py`: ejecuta transiciones con el motor de animación de Qt.
 - `bodetime/calendar.py`: contiene el selector y la tarjeta flotante con estilo cristal o blanco clásico.

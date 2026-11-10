@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QAbstractSpinBox, QApplication, QLabel, QTableView
 
 from bodetime.animations import SmoothTween
 from bodetime.appearance import build_calendar_stylesheet, build_stylesheet
+from bodetime.branding import application_icon
 from bodetime.calendar import GlassDateEdit
 from bodetime.clock import ClockFace
 from bodetime.splash import SplashScreen
@@ -59,6 +60,18 @@ def test_default_appearance_uses_apple_inspired_system_blue_and_light_surface():
     assert "background: #007aff" in stylesheet
     assert "background: #F5F5F7" in stylesheet
     assert "QStackedWidget { background: #F5F5F7; border: 0; }" in stylesheet
+
+
+def test_application_icon_uses_only_black_and_white():
+    image = application_icon("#007AFF").pixmap(128, 128).toImage()
+    pixels = [
+        image.pixelColor(x, y)
+        for x in range(image.width())
+        for y in range(image.height())
+        if image.pixelColor(x, y).alpha() > 0
+    ]
+    assert pixels
+    assert all(color.red() == color.green() == color.blue() for color in pixels)
 
 
 def test_calendar_date_field_keeps_qdateedit_api_and_selects_a_date():
@@ -192,17 +205,28 @@ def test_legacy_default_accent_migrates_and_report_mark_sets_window_icon(tmp_pat
     assert window.accent_color.lower() == "#007aff"
     assert settings.value("appearance/accent") == "#007AFF"
     assert not window.windowIcon().isNull()
-    assert window.brand_mark.accessibleName() == "Marca BODETIME, monograma y dial de tiempo"
+    assert window.brand_mark.accessibleName() == "Isotipo BODETIME en blanco y negro, con B y dial de tiempo"
     window.close()
     app.processEvents()
 
 
-def test_schedule_fields_use_clean_flat_inputs_without_legacy_spinner_borders(tmp_path):
+def test_schedule_fields_show_values_without_narrow_internal_editors(tmp_path):
     app = _app()
     settings = QSettings(str(tmp_path / "flat-inputs.ini"), QSettings.Format.IniFormat)
     window = MainWindow(object(), database_error="MySQL sin conexión", preferences=settings)
-    assert window.schedule_time.buttonSymbols() == QAbstractSpinBox.ButtonSymbols.NoButtons
-    assert window.schedule_tolerance.buttonSymbols() == QAbstractSpinBox.ButtonSymbols.NoButtons
+    assert window.schedule_time.buttonSymbols() == QAbstractSpinBox.ButtonSymbols.UpDownArrows
+    assert window.schedule_tolerance.buttonSymbols() == QAbstractSpinBox.ButtonSymbols.UpDownArrows
+    window.schedule_time.setTime(QTime(6, 0))
+    window.schedule_tolerance.setValue(15)
+    window.show()
+    app.processEvents()
+    assert window.schedule_time.text() == "06:00"
+    assert window.schedule_time.lineEdit().text() == "06:00"
+    assert window.schedule_time.lineEdit().width() >= 100
+    assert window.schedule_tolerance.text() == "15 minutos"
+    assert window.schedule_tolerance.lineEdit().text() == "15 minutos"
+    assert window.schedule_tolerance.lineEdit().width() >= 100
+    assert "QTimeEdit#scheduleTime::up-button" in build_stylesheet()
     window.close()
     app.processEvents()
 
@@ -212,8 +236,8 @@ def test_update_button_flow_starts_download_after_manual_search(tmp_path):
     settings = QSettings(str(tmp_path / "preferences.ini"), QSettings.Format.IniFormat)
     window = MainWindow(object(), database_error="MySQL sin conexión", preferences=settings)
     release = ReleaseInfo(
-        version="1.1.2",
-        tag="v1.1.2",
+        version="1.1.3",
+        tag="v1.1.3",
         notes_url="https://example.invalid/release",
         installer_url="https://example.invalid/installer.exe",
         installer_sha256="0" * 64,

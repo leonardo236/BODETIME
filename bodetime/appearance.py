@@ -137,6 +137,8 @@ QLabel#accentPreview {{ background: {accent}; color: {accent_text}; border-radiu
 QLineEdit, QComboBox, QDateEdit, QTimeEdit, QSpinBox {{ background: {colors['field']}; color: {colors['text']}; border: 1px solid {colors['border']}; border-radius: 8px; padding: 9px 10px; min-height: 21px; selection-background-color: {accent}; selection-color: white; }}
 QDateEdit#glassDateEdit::up-button, QDateEdit#glassDateEdit::down-button {{ width: 0px; height: 0px; border: 0; padding: 0; }}
 QDateEdit#glassDateEdit::up-arrow, QDateEdit#glassDateEdit::down-arrow {{ image: none; width: 0px; height: 0px; }}
+QTimeEdit#scheduleTime::up-button, QTimeEdit#scheduleTime::down-button, QSpinBox#scheduleTolerance::up-button, QSpinBox#scheduleTolerance::down-button {{ width: 0px; height: 0px; border: 0; padding: 0; }}
+QTimeEdit#scheduleTime::up-arrow, QTimeEdit#scheduleTime::down-arrow, QSpinBox#scheduleTolerance::up-arrow, QSpinBox#scheduleTolerance::down-arrow {{ image: none; width: 0px; height: 0px; }}
 QLineEdit:focus, QComboBox:focus, QDateEdit:focus, QTimeEdit:focus, QSpinBox:focus {{ border: 1px solid {colors['focus']}; }}
 QLineEdit:disabled, QComboBox:disabled, QDateEdit:disabled, QTimeEdit:disabled, QSpinBox:disabled {{ color: {colors['subtle']}; background: {colors['panel_alt']}; }}
 QComboBox QAbstractItemView, QListView, QListWidget {{ background: {colors['panel']}; color: {colors['text']}; border: 1px solid {colors['border']}; selection-background-color: {accent}; selection-color: {accent_text}; outline: none; padding: 5px; }}
