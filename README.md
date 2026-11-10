@@ -127,7 +127,8 @@ La actualización de interfaz se verificó localmente con estas comprobaciones:
 - `compileall` y `git diff --check`: completados sin errores.
 - La prueba automatizada usa Qt en modo sin ventana; comprueba que el reloj dibujado siga la hora configurada y que el selector mantenga fondos legibles y opacos.
 - Esta revisión no crea, cambia ni elimina registros de trabajadores o asistencias.
-- La generación de instalador y la publicación de esta versión dependen de que GitHub Actions complete el flujo asociado a la etiqueta de versión.
+- La interfaz se abrió en Windows con MySQL desconectado de forma deliberada; se comprobó el arranque, pero no se consultaron registros reales.
+- GitHub Actions aprobó las 41 pruebas y publicó el instalador de Windows de la versión 1.0.9. El comprobador reconoce esa publicación como nueva para un cliente 1.0.8 y valida que haya una suma SHA-256. No se descargó ni ejecutó el instalador ni se aceptó UAC durante esta revisión.
 
 El esquema y la interfaz se contrastaron con los cinco criterios de la rúbrica de pre-defensa. La plantilla JUDC aporta la estructura de exposición (introducción, objetivos, metodología, resultados y discusión, conclusiones), no criterios funcionales adicionales. Usa la configuración laboral y los datos autorizados por la bodega para la demostración.
 
