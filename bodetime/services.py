@@ -10,7 +10,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .database import Database
-from .admin_auth import verify_admin_password
 from .models import Attendance, JobRole, WorkSchedule, Worker
 
 
@@ -88,11 +87,9 @@ class BodeTimeService:
         for role in session.scalars(select(JobRole).where(JobRole.active.is_(True))):
             if normalized.casefold() == role.name.casefold():
                 return role.name
-        raise ValidationError("Selecciona un cargo del catálogo. Los cargos nuevos los registra el administrador.")
+        raise ValidationError("Selecciona un cargo del catálogo o agrega uno con el botón «Agregar cargo».")
 
-    def add_custom_role(self, name: str, admin_password: str) -> str:
-        if not verify_admin_password(admin_password):
-            raise ValidationError("La contraseña de administrador no es correcta o todavía no está configurada.")
+    def add_custom_role(self, name: str) -> str:
         role_name = self._clean_role_name(name)
         if any(role_name.casefold() == default.casefold() for default in self.DEFAULT_WAREHOUSE_ROLES):
             raise ValidationError("Ese cargo ya está incluido en el catálogo de bodega.")
@@ -107,9 +104,7 @@ class BodeTimeService:
                 raise ValidationError("Ya existe un cargo con ese nombre.") from exc
             return role.name
 
-    def remove_custom_role(self, name: str, admin_password: str) -> None:
-        if not verify_admin_password(admin_password):
-            raise ValidationError("La contraseña de administrador no es correcta.")
+    def remove_custom_role(self, name: str) -> None:
         role_name = self._clean_role_name(name)
         if any(role_name.casefold() == default.casefold() for default in self.DEFAULT_WAREHOUSE_ROLES):
             raise ValidationError("Los cargos incluidos por BODETIME no se pueden eliminar.")
@@ -130,9 +125,7 @@ class BodeTimeService:
             count = session.scalar(select(func.count()).select_from(Attendance).where(Attendance.worker_id == worker_id)) or 0
             return worker.full_name, count
 
-    def delete_worker(self, worker_id: int, admin_password: str) -> int:
-        if not verify_admin_password(admin_password):
-            raise ValidationError("La contraseña de administrador no es correcta.")
+    def delete_worker(self, worker_id: int) -> int:
         with self.database.session() as session:
             worker = session.scalar(select(Worker).where(Worker.id == worker_id).with_for_update())
             if worker is None:

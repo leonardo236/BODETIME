@@ -4,88 +4,23 @@ import os
 from datetime import date, timedelta
 from pathlib import Path
 
-from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QRegularExpression, Qt, QTime, QTimer, QUrl
-from PySide6.QtGui import QDesktopServices, QRegularExpressionValidator
+from PySide6.QtCore import QRegularExpression, QSettings, Qt, QTime, QTimer, QUrl
+from PySide6.QtGui import QColor, QDesktopServices, QRegularExpressionValidator
 from PySide6.QtWidgets import (
-    QAbstractItemView, QApplication, QComboBox, QDateEdit, QDialog, QDialogButtonBox,
-    QFileDialog, QFrame, QGraphicsOpacityEffect, QHBoxLayout, QInputDialog, QLabel,
-    QLineEdit, QListWidget, QMainWindow, QMessageBox, QProgressBar, QPushButton,
-    QProgressDialog, QSpinBox, QStackedWidget, QTableWidget, QTableWidgetItem,
-    QTimeEdit, QVBoxLayout, QWidget,
+    QAbstractItemView, QApplication, QCheckBox, QColorDialog, QComboBox, QDateEdit,
+    QDialog, QFileDialog, QFrame, QGraphicsOpacityEffect, QHBoxLayout, QInputDialog,
+    QLabel, QLineEdit, QListWidget, QMainWindow, QMessageBox, QProgressBar,
+    QPushButton, QProgressDialog, QScrollArea, QSpinBox, QStackedWidget, QTableWidget,
+    QTableWidgetItem, QTimeEdit, QVBoxLayout, QWidget,
 )
 
-from .admin_auth import has_admin_password, is_local_system_admin, save_admin_password, verify_admin_password
+from .animations import SmoothTween, frame_interval_ms
+from .appearance import ACCENT_PRESETS, build_stylesheet
 from .reports import generate_attendance_pdf
 from .services import BodeTimeService, ValidationError, AttendanceRow
 from .update_tasks import InstallerDownloadTask, ReleaseCheckTask
 from .updater import ReleaseInfo
 from .version import APP_VERSION
-
-
-STYLESHEET = """
-QWidget { font-family: 'Segoe UI'; font-size: 10pt; color: #303B35; }
-QMainWindow, QWidget#content { background: #F3F5F1; }
-QWidget#sidebar { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #354B41, stop:1 #2B4037); }
-QFrame#brandMark { background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #91B395, stop:1 #71967C); border: 1px solid #A8C5A8; border-radius: 14px; }
-QLabel#brandGlyph { color: white; font-size: 23pt; font-weight: 800; }
-QLabel#brand { color: white; font-size: 17pt; font-weight: 750; }
-QLabel#brandSub { color: #B8C8BD; font-size: 8pt; letter-spacing: 1px; }
-QLabel#navCaption { color: #A0B1A5; font-size: 8pt; font-weight: 700; letter-spacing: 1.2px; padding: 22px 12px 7px; }
-QFrame#sideRule { background: #52665B; max-height: 1px; }
-QPushButton#nav { color: #E0E7E1; background: transparent; border: 0; border-left: 3px solid transparent; border-radius: 8px; text-align: left; padding: 12px 13px; font-size: 10.5pt; }
-QPushButton#nav:hover { color: white; background: #40594C; }
-QPushButton#nav[active="true"] { color: white; background: #4A6757; border-left: 3px solid #B7CBAA; font-weight: 650; }
-QLabel#pageTitle { color: #2C4034; font-size: 24pt; font-weight: 750; }
-QLabel#muted { color: #718077; }
-QLabel#topContext { color: #78877D; font-size: 8pt; font-weight: 700; letter-spacing: 1.1px; }
-QLabel#topDate { color: #43594B; font-size: 9pt; font-weight: 600; padding: 8px 12px; background: #E7ECE5; border-radius: 8px; }
-QFrame#connectionBanner { background: #FFF4DF; border: 1px solid #F0D8A8; border-radius: 12px; }
-QLabel#bannerText { color: #75430C; padding: 9px 10px; }
-QPushButton#retryDatabase { background: #F6E4BD; color: #694000; margin: 5px; }
-QFrame#updateBanner { background: #EAF0E8; border: 1px solid #D2DED1; border-radius: 12px; }
-QLabel#updateText { color: #354F3D; padding: 9px 10px; font-weight: 600; }
-QPushButton#updateNow { background: #5B8067; color: white; margin: 5px; }
-QPushButton#updateNow:hover { background: #4E705A; }
-QPushButton#updateNotes { background: #DDE7DC; color: #354B3D; margin: 5px; }
-QPushButton#dismissUpdate { background: transparent; color: #5E7063; padding: 7px; }
-QMessageBox { background: #FFFFFF; }
-QMessageBox QLabel { color: #26392E; min-width: 360px; }
-QMessageBox QPushButton { min-width: 76px; }
-QFrame#metricPanel, QWidget#panel { background: #FEFEFC; border: 1px solid #DEE4DC; border-radius: 12px; }
-QFrame#metricPanel { background: #FFFFFF; }
-QFrame#metricDivider { background: #E5ECE3; max-width: 1px; }
-QLabel#metricValue { color: #456B54; font-size: 24pt; font-weight: 750; }
-QLabel#metricLabel { color: #596B5F; font-size: 9pt; font-weight: 650; }
-QLabel#metricHint { color: #89978C; font-size: 8pt; }
-QLabel#sectionTitle { color: #344D3D; font-size: 12pt; font-weight: 700; }
-QLabel#eyebrow { color: #66836D; font-size: 8pt; font-weight: 700; letter-spacing: 1.2px; }
-QLabel#heroTitle { color: #3A5945; font-size: 20pt; font-weight: 700; }
-QLabel#heroCaption { color: #687C6B; font-size: 10pt; }
-QFrame#dashboardHero { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #EEF2E9, stop:1 #E6ECE5); border: 1px solid #DCE4D9; border-radius: 13px; }
-QFrame#heroClock { background: transparent; border: 0; }
-QLabel#clockValue { color: #45654E; font-size: 25pt; font-weight: 700; }
-QLabel#clockCaption { color: #6E8071; font-size: 8pt; font-weight: 650; letter-spacing: 0.7px; }
-QFrame#panelHeader { background: transparent; }
-QLabel#insightValue { color: #456B54; font-size: 21pt; font-weight: 750; }
-QLabel#insightLabel { color: #687C6D; font-size: 9pt; }
-QProgressBar { background: #E5EAE3; border: 0; border-radius: 5px; height: 9px; text-align: center; }
-QProgressBar::chunk { background: #8BAA8B; border-radius: 5px; }
-QLabel#insightNote { color: #7B8D7E; font-size: 8pt; }
-QLineEdit, QComboBox, QDateEdit, QTimeEdit, QSpinBox { background: #FEFEFC; border: 1px solid #D4DDD3; border-radius: 8px; padding: 9px 10px; min-height: 21px; selection-background-color: #8EA78D; }
-QLineEdit:focus, QComboBox:focus, QDateEdit:focus, QTimeEdit:focus, QSpinBox:focus { border: 1px solid #819B83; }
-QPushButton { background: #E8ECE6; border: 0; border-radius: 8px; padding: 10px 15px; color: #354B3D; font-weight: 650; }
-QPushButton:hover { background: #DDE5DC; }
-QPushButton:focus { border: 1px solid #9DB49B; }
-QPushButton#primary { background: #5B8067; color: white; }
-QPushButton#primary:hover { background: #4E705A; }
-QPushButton#danger { background: #FCE9E7; color: #A6312A; }
-QTableWidget { background: #FEFEFC; border: 1px solid #DEE4DC; border-radius: 10px; gridline-color: #EEF1EC; selection-background-color: #E4ECE3; selection-color: #344D3D; alternate-background-color: #FAFBF8; outline: none; }
-QHeaderView::section { background: #F0F3EE; border: 0; border-bottom: 1px solid #DCE3DA; padding: 11px 9px; color: #68786D; font-size: 8pt; font-weight: 700; }
-QTableWidget::item { padding: 9px 7px; border-bottom: 1px solid #EEF1EC; }
-QScrollBar:vertical { background: transparent; width: 8px; margin: 4px 1px; }
-QScrollBar::handle:vertical { background: #C5D0C4; border-radius: 4px; min-height: 30px; }
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
-"""
 
 
 def _label(text: str, object_name: str | None = None) -> QLabel:
@@ -123,18 +58,19 @@ def _put(table: QTableWidget, row: int, col: int, value: object, user_data: int 
 
 
 class JobRolesDialog(QDialog):
-    """Permite al administrador agregar y retirar cargos personalizados."""
+    """Permite mantener las opciones personalizadas del catálogo de cargos."""
 
-    def __init__(self, service: BodeTimeService, admin_password: str, parent=None):
+    def __init__(self, service: BodeTimeService, parent=None):
         super().__init__(parent)
         self.service = service
-        self.admin_password = admin_password
-        self.setWindowTitle("Administrar cargos de bodega")
-        self.setMinimumWidth(470)
+        self.setWindowTitle("Cargos de bodega")
+        self.setMinimumSize(520, 430)
         layout = QVBoxLayout(self)
-        layout.addWidget(_label("Cargos personalizados", "sectionTitle"))
-        layout.addWidget(_label("Los cargos base de bodega siempre están disponibles. Aquí puedes agregar opciones aprobadas para esta operación.", "muted"))
+        layout.addWidget(_label("Catálogo de cargos", "sectionTitle"))
+        layout.addWidget(_label("Agrega los puestos que usa tu bodega. Los cambios quedan disponibles para los demás usuarios de esta base de datos.", "muted"))
         self.roles = QListWidget()
+        self.roles.setObjectName("roleList")
+        self.roles.setAlternatingRowColors(True)
         layout.addWidget(self.roles, 1)
         form = QHBoxLayout()
         self.new_role = QLineEdit()
@@ -144,11 +80,14 @@ class JobRolesDialog(QDialog):
         add = QPushButton("Agregar cargo")
         add.setObjectName("primary")
         add.clicked.connect(self.add_role)
+        self.new_role.returnPressed.connect(self.add_role)
         form.addWidget(self.new_role, 1)
         form.addWidget(add)
         layout.addLayout(form)
+        self.status = _label("Los cargos base no se pueden borrar. Un cargo en uso tampoco se puede quitar.", "muted")
+        layout.addWidget(self.status)
         buttons = QHBoxLayout()
-        remove = QPushButton("Eliminar cargo seleccionado")
+        remove = QPushButton("Quitar cargo")
         remove.setObjectName("danger")
         remove.clicked.connect(self.remove_role)
         close = QPushButton("Cerrar")
@@ -169,15 +108,17 @@ class JobRolesDialog(QDialog):
 
     def add_role(self) -> None:
         try:
-            self.service.add_custom_role(self.new_role.text(), self.admin_password)
+            self.service.add_custom_role(self.new_role.text())
         except ValidationError as exc:
             QMessageBox.warning(self, "Cargo no válido", str(exc))
             return
         except Exception as exc:
             QMessageBox.critical(self, "No se pudo guardar el cargo", str(exc))
             return
+        role = " ".join(self.new_role.text().split())
         self.new_role.clear()
         self.refresh()
+        self.status.setText(f"«{role}» ya está disponible en el selector de trabajadores.")
 
     def remove_role(self) -> None:
         selected = self.roles.currentItem()
@@ -193,7 +134,7 @@ class JobRolesDialog(QDialog):
         if answer != QMessageBox.StandardButton.Yes:
             return
         try:
-            self.service.remove_custom_role(role, self.admin_password)
+            self.service.remove_custom_role(role)
         except ValidationError as exc:
             QMessageBox.warning(self, "No se puede eliminar", str(exc))
             return
@@ -201,20 +142,40 @@ class JobRolesDialog(QDialog):
             QMessageBox.critical(self, "No se pudo eliminar el cargo", str(exc))
             return
         self.refresh()
+        self.status.setText(f"Se quitó «{role}» del catálogo.")
 
 
 class MainWindow(QMainWindow):
     """Muestra las pantallas y delega las reglas de datos al servicio."""
     PAGES = ["Inicio", "Trabajadores", "Asistencia", "Reportes", "Configuración"]
 
-    def __init__(self, service: BodeTimeService, database_error: str | None = None):
+    def __init__(self, service: BodeTimeService, database_error: str | None = None, preferences: QSettings | None = None):
         super().__init__()
         self.service = service
         self.database_error = database_error
+        self.preferences = preferences or QSettings("BODETIME", "BODETIME")
+        self.theme_mode = str(self.preferences.value("appearance/mode", "light"))
+        if self.theme_mode not in {"light", "dark"}:
+            self.theme_mode = "light"
+        saved_accent = QColor(str(self.preferences.value("appearance/accent", "#16877B")))
+        self.accent_color = saved_accent.name() if saved_accent.isValid() else "#16877B"
+        self.motion_enabled = self.preferences.value("appearance/animations", True, type=bool)
+        self._frame_interval = 8
+        self._active_tweens: set[SmoothTween] = set()
+        self._widget_tweens: dict[QWidget, tuple[SmoothTween, QGraphicsOpacityEffect]] = {}
+        self._progress_tween: SmoothTween | None = None
+        self._page_effect: QGraphicsOpacityEffect | None = None
+        self._intro_started = False
+        self._intro_finished = False
+        self._transition_widget: QWidget | None = None
+        self._refresh_frame_interval()
+        app = QApplication.instance()
+        if app:
+            app.setStyleSheet(build_stylesheet(self.theme_mode, self.accent_color))
         self.setWindowTitle("BODETIME | Control de asistencia")
         self.setMinimumSize(1120, 740)
         self.resize(1320, 820)
-        self.setWindowOpacity(0.0)
+        self.setWindowOpacity(0.0 if self.motion_enabled else 1.0)
         root = QWidget()
         root_layout = QHBoxLayout(root)
         root_layout.setContentsMargins(0, 0, 0, 0)
@@ -249,18 +210,10 @@ class MainWindow(QMainWindow):
 
         self.content = QWidget()
         self.content.setObjectName("content")
-        self._intro_started = False
-        self._intro_finished = False
-        self._page_animation: QPropertyAnimation | None = None
-        self._page_effect: QGraphicsOpacityEffect | None = None
-        self._transition_widget: QWidget | None = None
         self.latest_release: ReleaseInfo | None = None
         self._release_check_task: ReleaseCheckTask | None = None
         self._installer_download_task: InstallerDownloadTask | None = None
         self._update_progress_dialog: QProgressDialog | None = None
-        self.window_animation = QPropertyAnimation(self, b"windowOpacity", self)
-        self.window_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
-        self.window_animation.finished.connect(self._finish_intro)
         content_layout = QVBoxLayout(self.content)
         content_layout.setContentsMargins(30, 20, 30, 24)
         content_layout.setSpacing(15)
@@ -340,7 +293,7 @@ class MainWindow(QMainWindow):
     def navigate(self, index: int) -> None:
         changed = self.stack.currentIndex() != index
         self.stack.setCurrentIndex(index)
-        if changed and self._intro_finished:
+        if changed and self._intro_finished and self.motion_enabled:
             self._fade_current_page()
         for i, button in enumerate(self.nav_buttons):
             button.setProperty("active", i == index)
@@ -358,12 +311,97 @@ class MainWindow(QMainWindow):
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
+        if not getattr(self, "_screen_signal_connected", False) and self.windowHandle():
+            self.windowHandle().screenChanged.connect(self._refresh_frame_interval)
+            self._screen_signal_connected = True
         if not self._intro_started:
             self._intro_started = True
-            self.window_animation.setDuration(520)
-            self.window_animation.setStartValue(0.0)
-            self.window_animation.setEndValue(1.0)
-            QTimer.singleShot(50, self.window_animation.start)
+            if self.motion_enabled:
+                QTimer.singleShot(25, lambda: self._start_tween(self.setWindowOpacity, 0.0, 1.0, 420, self._finish_intro))
+            else:
+                self.setWindowOpacity(1.0)
+                self._finish_intro()
+
+    def _refresh_frame_interval(self, screen=None) -> None:
+        screen = screen or (self.windowHandle().screen() if self.windowHandle() else QApplication.primaryScreen())
+        rate = screen.refreshRate() if screen else None
+        self._frame_interval = frame_interval_ms(rate)
+
+    def _apply_appearance(self) -> None:
+        app = QApplication.instance()
+        if app:
+            app.setStyleSheet(build_stylesheet(self.theme_mode, self.accent_color))
+        self.preferences.setValue("appearance/mode", self.theme_mode)
+        self.preferences.setValue("appearance/accent", self.accent_color)
+        self.preferences.sync()
+        if hasattr(self, "accent_preview"):
+            self.accent_preview.setText(f"Acento actual · {self.accent_color.upper()}")
+
+    def _on_theme_changed(self, _index: int) -> None:
+        selected = self.theme_selector.currentData()
+        if selected in {"light", "dark"}:
+            self.theme_mode = selected
+            self._apply_appearance()
+
+    def _populate_accent_selector(self, selected_color: str) -> None:
+        self.accent_selector.blockSignals(True)
+        self.accent_selector.clear()
+        preset_colors = {color.lower() for _, color in ACCENT_PRESETS}
+        if selected_color.lower() not in preset_colors:
+            self.accent_selector.addItem(f"Personalizado · {selected_color.upper()}", selected_color)
+        for name, color in ACCENT_PRESETS:
+            self.accent_selector.addItem(name, color)
+        self.accent_selector.addItem("Elegir otro color…", "__custom__")
+        index = self.accent_selector.findData(selected_color)
+        self.accent_selector.setCurrentIndex(index if index >= 0 else 0)
+        self.accent_selector.blockSignals(False)
+
+    def _on_accent_activated(self, index: int) -> None:
+        selected = self.accent_selector.itemData(index)
+        if selected == "__custom__":
+            chosen = QColorDialog.getColor(QColor(self.accent_color), self, "Elige el color principal")
+            if not chosen.isValid():
+                self._populate_accent_selector(self.accent_color)
+                return
+            selected = chosen.name()
+        if isinstance(selected, str) and QColor(selected).isValid():
+            self.accent_color = QColor(selected).name()
+            self._populate_accent_selector(self.accent_color)
+            self._apply_appearance()
+
+    def _on_animations_toggled(self, enabled: bool) -> None:
+        self.motion_enabled = enabled
+        self.preferences.setValue("appearance/animations", enabled)
+        self.preferences.sync()
+        if enabled:
+            return
+        for tween in list(self._active_tweens):
+            self._cancel_tween(tween)
+        for widget, (_, effect) in list(self._widget_tweens.items()):
+            if widget.graphicsEffect() is effect:
+                widget.setGraphicsEffect(None)
+        self._widget_tweens.clear()
+        self.setWindowOpacity(1.0)
+        self._finish_intro()
+
+    def _start_tween(self, setter, start: float, end: float, duration: int, on_finished=None) -> SmoothTween | None:
+        if not self.motion_enabled:
+            setter(float(end))
+            if on_finished:
+                on_finished()
+            return None
+        tween = SmoothTween(setter, start, end, duration, self._frame_interval, self)
+        self._active_tweens.add(tween)
+        tween.finished.connect(lambda current=tween: self._active_tweens.discard(current))
+        if on_finished:
+            tween.finished.connect(on_finished)
+        tween.start()
+        return tween
+
+    def _cancel_tween(self, tween: SmoothTween | None) -> None:
+        if tween is not None:
+            tween.cancel()
+            self._active_tweens.discard(tween)
 
     def closeEvent(self, event) -> None:
         if hasattr(self, "update_timer"):
@@ -382,26 +420,32 @@ class MainWindow(QMainWindow):
         self._intro_finished = True
 
     def _fade_current_page(self) -> None:
-        if self._page_animation and self._page_animation.state() == QPropertyAnimation.State.Running:
-            self._page_animation.stop()
-        if self._transition_widget is not None:
-            self._transition_widget.setGraphicsEffect(None)
         page = self.stack.currentWidget()
         if page is None:
             return
-        effect = QGraphicsOpacityEffect(page)
-        effect.setOpacity(0.72)
-        page.setGraphicsEffect(effect)
-        animation = QPropertyAnimation(effect, b"opacity", self)
-        animation.setDuration(220)
-        animation.setStartValue(0.72)
-        animation.setEndValue(1.0)
-        animation.setEasingCurve(QEasingCurve.Type.OutCubic)
-        animation.finished.connect(lambda: page.setGraphicsEffect(None))
-        self._page_effect = effect
-        self._transition_widget = page
-        self._page_animation = animation
-        animation.start()
+        self._fade_widget(page, duration=200, start=0.84)
+
+    def _fade_widget(self, widget: QWidget, duration: int = 190, start: float = 0.0) -> None:
+        if not self.motion_enabled:
+            return
+        previous = self._widget_tweens.pop(widget, None)
+        if previous:
+            self._cancel_tween(previous[0])
+            if widget.graphicsEffect() is previous[1]:
+                widget.setGraphicsEffect(None)
+        effect = QGraphicsOpacityEffect(widget)
+        widget.setGraphicsEffect(effect)
+
+        def finish() -> None:
+            active = self._widget_tweens.get(widget)
+            if active and active[1] is effect:
+                self._widget_tweens.pop(widget, None)
+                if widget.graphicsEffect() is effect:
+                    widget.setGraphicsEffect(None)
+
+        tween = self._start_tween(effect.setOpacity, start, 1.0, duration, finish)
+        if tween:
+            self._widget_tweens[widget] = (tween, effect)
 
     def check_for_updates(self, manual: bool = False) -> None:
         if self._release_check_task and self._release_check_task.isRunning():
@@ -441,23 +485,6 @@ class MainWindow(QMainWindow):
         self.update_status.setText("No se pudo comprobar si hay una versión nueva.")
         if manual:
             QMessageBox.warning(self, "No se pudo buscar", message)
-
-    def _fade_widget(self, widget: QWidget, duration: int = 200) -> None:
-        effect = QGraphicsOpacityEffect(widget)
-        effect.setOpacity(0.0)
-        widget.setGraphicsEffect(effect)
-        animation = QPropertyAnimation(effect, b"opacity", self)
-        animation.setDuration(duration)
-        animation.setStartValue(0.0)
-        animation.setEndValue(1.0)
-        animation.setEasingCurve(QEasingCurve.Type.OutCubic)
-        animation.finished.connect(lambda: widget.setGraphicsEffect(None))
-        animation.start()
-        # Keep a reference while Qt animates its property.
-        if not hasattr(self, "_notice_animations"):
-            self._notice_animations = []
-        self._notice_animations.append(animation)
-        animation.finished.connect(lambda: self._notice_animations.remove(animation) if animation in self._notice_animations else None)
 
     def open_release_notes(self) -> None:
         if self.latest_release:
@@ -540,7 +567,9 @@ class MainWindow(QMainWindow):
             self.database_retry_timer.start()
         if hasattr(self, "dashboard_connection"):
             self.dashboard_connection.setText("●  SIN CONEXIÓN A MYSQL")
-            self.dashboard_connection.setStyleSheet("color:#8A591D; background:#FFF0D5; border-radius:8px; padding:8px 12px;")
+            self.dashboard_connection.setProperty("state", "offline")
+            self.dashboard_connection.style().unpolish(self.dashboard_connection)
+            self.dashboard_connection.style().polish(self.dashboard_connection)
         self.statusBar().showMessage("MySQL desconectado")
 
     def clear_database_error(self) -> None:
@@ -550,7 +579,9 @@ class MainWindow(QMainWindow):
         self.banner.setVisible(False)
         if hasattr(self, "dashboard_connection"):
             self.dashboard_connection.setText("●  MYSQL CONECTADO")
-            self.dashboard_connection.setStyleSheet("color:#3C754F; background:#E7F1E4; border-radius:8px; padding:8px 12px;")
+            self.dashboard_connection.setProperty("state", "online")
+            self.dashboard_connection.style().unpolish(self.dashboard_connection)
+            self.dashboard_connection.style().polish(self.dashboard_connection)
         self.statusBar().showMessage("Conectado a MySQL", 5000)
 
     @staticmethod
@@ -638,8 +669,8 @@ class MainWindow(QMainWindow):
         heading = QHBoxLayout()
         heading.addWidget(_label("Resumen de hoy", "pageTitle"))
         heading.addStretch(1)
-        self.dashboard_connection = _label("●  MYSQL CONECTADO", "topContext")
-        self.dashboard_connection.setStyleSheet("color:#3C754F; background:#E7F1E4; border-radius:8px; padding:8px 12px;")
+        self.dashboard_connection = _label("●  MYSQL CONECTADO", "dashboardConnection")
+        self.dashboard_connection.setProperty("state", "online")
         heading.addWidget(self.dashboard_connection)
         layout.addLayout(heading)
 
@@ -703,9 +734,7 @@ class MainWindow(QMainWindow):
         insight_box.addWidget(self.insight_ratio)
         insight_box.addWidget(_label("personas con entrada registrada", "insightLabel"))
         self.attendance_progress = QProgressBar(); self.attendance_progress.setRange(0, 100); self.attendance_progress.setValue(0); self.attendance_progress.setTextVisible(False)
-        self.progress_animation = QPropertyAnimation(self.attendance_progress, b"value", self)
-        self.progress_animation.setDuration(420)
-        self.progress_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._progress_tween = None
         insight_box.addWidget(self.attendance_progress)
         self.insight_percent = _label("Sin registros todavía", "insightNote")
         insight_box.addWidget(self.insight_percent)
@@ -724,10 +753,12 @@ class MainWindow(QMainWindow):
             marked_ratio = min(summary.present_today, summary.active_workers)
             percentage = round(marked_ratio * 100 / summary.active_workers) if summary.active_workers else 0
             self.insight_ratio.setText(f"{marked_ratio} / {summary.active_workers}")
-            self.progress_animation.stop()
-            self.progress_animation.setStartValue(self.attendance_progress.value())
-            self.progress_animation.setEndValue(percentage)
-            self.progress_animation.start()
+            self._cancel_tween(self._progress_tween)
+            self._progress_tween = self._start_tween(
+                lambda value: self.attendance_progress.setValue(round(value)),
+                self.attendance_progress.value(), percentage, 420,
+                lambda: setattr(self, "_progress_tween", None),
+            )
             self.insight_percent.setText(f"{percentage}% del equipo registrado" if summary.active_workers else "Registra trabajadores para iniciar")
             rows = self.service.attendance_history(date.today(), date.today())
             self._fill_attendance_table(self.dashboard_table, rows)
@@ -753,13 +784,26 @@ class MainWindow(QMainWindow):
         self.worker_last = QLineEdit(); self.worker_last.setPlaceholderText("Apellidos *"); self.worker_last.setMaxLength(80)
         self.worker_last.setValidator(QRegularExpressionValidator(QRegularExpression(r"[\p{L}\p{M} .’'-]{0,80}"), self.worker_last))
         self.worker_role = QComboBox(); self.worker_role.setMinimumWidth(150); self.worker_role.setEditable(False)
+        self.worker_role.view().setObjectName("cargoPopup")
+        self.worker_role.view().setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.worker_role.view().setFrameShape(QFrame.Shape.NoFrame)
+        self.worker_role.view().setLineWidth(0)
         self.worker_role.addItem("Selecciona un cargo *", None)
         for role in BodeTimeService.DEFAULT_WAREHOUSE_ROLES:
             self.worker_role.addItem(role, role)
+        self.add_cargo_button = QPushButton("+ Cargo")
+        self.add_cargo_button.setToolTip("Agregar un cargo nuevo al catálogo compartido")
+        self.add_cargo_button.clicked.connect(self.add_worker_role)
+        cargo_field = QWidget()
+        cargo_layout = QHBoxLayout(cargo_field)
+        cargo_layout.setContentsMargins(0, 0, 0, 0)
+        cargo_layout.setSpacing(6)
+        cargo_layout.addWidget(self.worker_role, 1)
+        cargo_layout.addWidget(self.add_cargo_button)
         self.worker_phone = QLineEdit(); self.worker_phone.setPlaceholderText("Teléfono"); self.worker_phone.setMaxLength(30)
         self.worker_phone.setValidator(QRegularExpressionValidator(QRegularExpression(r"\+?[0-9 ()-]{0,30}"), self.worker_phone))
         self.worker_phone.setToolTip("Entre 7 y 15 dígitos; puedes usar +, espacios, guiones o paréntesis.")
-        for field, caption in [(self.worker_code, "Código *"), (self.worker_first, "Nombres *"), (self.worker_last, "Apellidos *"), (self.worker_role, "Cargo"), (self.worker_phone, "Teléfono")]:
+        for field, caption in [(self.worker_code, "Código *"), (self.worker_first, "Nombres *"), (self.worker_last, "Apellidos *"), (cargo_field, "Cargo"), (self.worker_phone, "Teléfono")]:
             group = QVBoxLayout(); group.addWidget(_label(caption, "muted")); group.addWidget(field); fields.addLayout(group, 1)
         form.addLayout(fields)
         buttons = QHBoxLayout()
@@ -889,73 +933,30 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Operación completada", message)
             self.clear_worker_form(); self.refresh_workers(); self.refresh_dashboard(); self.refresh_attendance_workers(); self.refresh_report_workers()
 
-    def _admin_password(self) -> str | None:
-        if not has_admin_password():
-            if not is_local_system_admin():
-                QMessageBox.warning(
-                    self, "Se necesita un administrador de Windows",
-                    "Todavía no hay una clave administradora de BODETIME. Cierra la aplicación y ábrela una vez con «Ejecutar como administrador» para crearla.",
-                )
-                return None
-            QMessageBox.information(
-                self, "Configura el administrador",
-                "Esta instalación todavía no tiene administrador de BODETIME. La primera persona responsable creará una clave privada para administrar cargos y eliminar trabajadores.",
-            )
-            password, accepted = QInputDialog.getText(
-                self, "Crear clave administradora", "Nueva clave (mínimo 12 caracteres):", QLineEdit.EchoMode.Password,
-            )
-            if not accepted:
-                return None
-            confirmation, confirmed = QInputDialog.getText(
-                self, "Confirmar clave", "Repite la clave administradora:", QLineEdit.EchoMode.Password,
-            )
-            if not confirmed:
-                return None
-            if password != confirmation:
-                QMessageBox.warning(self, "Las claves no coinciden", "Escribe la misma clave en ambos campos.")
-                return None
-            try:
-                save_admin_password(password)
-            except (OSError, ValueError) as exc:
-                QMessageBox.critical(self, "No se pudo guardar la clave", str(exc))
-                return None
-            QMessageBox.information(self, "Administrador configurado", "La clave se guardó como hash en la configuración privada de esta computadora.")
-            return password
-
-        password, accepted = QInputDialog.getText(
-            self, "Autorización de administrador", "Clave administradora de BODETIME:", QLineEdit.EchoMode.Password,
+    def add_worker_role(self) -> None:
+        name, accepted = QInputDialog.getText(
+            self, "Agregar cargo", "Nombre del nuevo cargo de bodega:", QLineEdit.EchoMode.Normal,
         )
         if not accepted:
-            return None
-        if not verify_admin_password(password):
-            QMessageBox.warning(self, "Acceso denegado", "La clave administradora no es correcta.")
-            return None
-        return password
+            return
+        role = self._guard(self.service.add_custom_role, name)
+        if not role:
+            return
+        self.refresh_worker_roles()
+        index = self.worker_role.findData(role)
+        if index >= 0:
+            self.worker_role.setCurrentIndex(index)
+        self.statusBar().showMessage(f"Cargo «{role}» agregado y seleccionado.", 6000)
 
     def manage_job_roles(self) -> None:
-        password = self._admin_password()
-        if password is None:
-            return
-        dialog = JobRolesDialog(self.service, password, self)
+        dialog = JobRolesDialog(self.service, self)
         dialog.exec()
         self.refresh_worker_roles()
-        self.refresh_admin_status()
-
-    def refresh_admin_status(self) -> None:
-        configured = has_admin_password()
-        self.admin_status.setText(
-            "Clave administradora configurada en esta computadora." if configured
-            else "Aún no se configuró la clave. El primer registro requiere una cuenta administradora de Windows."
-        )
-        self.manage_roles_button.setText("Administrar cargos" if configured else "Configurar administrador")
 
     def delete_selected_worker(self) -> None:
         row = self.workers_table.currentRow()
         if row < 0:
             QMessageBox.warning(self, "Selecciona un trabajador", "Elige el trabajador que deseas eliminar.")
-            return
-        password = self._admin_password()
-        if password is None:
             return
         worker_id = self.workers_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
         info = self._guard(self.service.worker_delete_info, worker_id)
@@ -973,7 +974,7 @@ class MainWindow(QMainWindow):
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
-        deleted_count = self._guard(self.service.delete_worker, worker_id, password)
+        deleted_count = self._guard(self.service.delete_worker, worker_id)
         if deleted_count is None:
             return
         QMessageBox.information(self, "Trabajador eliminado", f"El registro y {deleted_count} asistencia(s) asociada(s) se eliminaron definitivamente.")
@@ -1106,10 +1107,69 @@ class MainWindow(QMainWindow):
         if answer == QMessageBox.StandardButton.Yes: QDesktopServices.openUrl(QUrl.fromLocalFile(str(result)))
 
     def _build_settings(self) -> None:
-        page = QWidget(); layout = QVBoxLayout(page); layout.setContentsMargins(0, 0, 0, 0)
+        page = QWidget()
+        page_layout = QVBoxLayout(page)
+        page_layout.setContentsMargins(0, 0, 0, 0)
+        page_layout.setSpacing(0)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(0, 0, 2, 0)
+        scroll.setWidget(content)
+        page_layout.addWidget(scroll)
         layout.addWidget(_label("Configuración", "pageTitle"))
-        layout.addWidget(_label("Define el horario laboral y la tolerancia aplicada a las tardanzas", "muted"))
-        panel = _panel(); box = QVBoxLayout(panel); box.setContentsMargins(22, 22, 22, 22); box.setSpacing(15)
+        subtitle = _label("Personaliza la apariencia y los valores de la jornada", "muted")
+        subtitle.setWordWrap(True)
+        layout.addWidget(subtitle)
+
+        appearance_panel = _panel()
+        appearance_box = QVBoxLayout(appearance_panel)
+        appearance_box.setContentsMargins(20, 16, 20, 16)
+        appearance_box.setSpacing(10)
+        appearance_box.addWidget(_label("Apariencia", "sectionTitle"))
+        appearance_row = QHBoxLayout()
+        theme_group = QVBoxLayout()
+        theme_group.addWidget(_label("Tema", "muted"))
+        self.theme_selector = QComboBox()
+        self.theme_selector.addItem("Claro", "light")
+        self.theme_selector.addItem("Oscuro", "dark")
+        self.theme_selector.setCurrentIndex(max(0, self.theme_selector.findData(self.theme_mode)))
+        self.theme_selector.currentIndexChanged.connect(self._on_theme_changed)
+        theme_group.addWidget(self.theme_selector)
+        appearance_row.addLayout(theme_group)
+
+        accent_group = QVBoxLayout()
+        accent_group.addWidget(_label("Color principal", "muted"))
+        self.accent_selector = QComboBox()
+        self._populate_accent_selector(self.accent_color)
+        self.accent_selector.activated.connect(self._on_accent_activated)
+        accent_group.addWidget(self.accent_selector)
+        appearance_row.addLayout(accent_group)
+        appearance_row.addStretch(1)
+
+        self.animations_toggle = QCheckBox("Transiciones suaves")
+        self.animations_toggle.setChecked(self.motion_enabled)
+        self.animations_toggle.toggled.connect(self._on_animations_toggled)
+        appearance_row.addWidget(self.animations_toggle, 0, Qt.AlignmentFlag.AlignVCenter)
+        appearance_box.addLayout(appearance_row)
+        preview_row = QHBoxLayout()
+        self.accent_preview = _label(f"Acento actual · {self.accent_color.upper()}", "accentPreview")
+        self.accent_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.accent_preview.setMaximumWidth(280)
+        preview_row.addWidget(self.accent_preview)
+        preview_note = _label("Puedes cambiar el tema y el color en cualquier momento.", "muted")
+        preview_note.setWordWrap(True)
+        preview_row.addWidget(preview_note, 1)
+        appearance_box.addLayout(preview_row)
+        animation_note = _label("Ritmo sincronizado con la pantalla, hasta 120 Hz cuando el monitor lo permite.", "muted")
+        animation_note.setWordWrap(True)
+        appearance_box.addWidget(animation_note)
+        layout.addWidget(appearance_panel)
+
+        panel = _panel(); box = QVBoxLayout(panel); box.setContentsMargins(22, 18, 22, 18); box.setSpacing(12)
         box.addWidget(_label("Horario de trabajo", "sectionTitle"))
         row = QHBoxLayout()
         self.schedule_time = QTimeEdit(); self.schedule_time.setDisplayFormat("HH:mm")
@@ -1118,32 +1178,34 @@ class MainWindow(QMainWindow):
             group = QVBoxLayout(); group.addWidget(_label(text, "muted")); group.addWidget(widget); row.addLayout(group)
         row.addStretch(1); box.addLayout(row)
         save = QPushButton("Guardar configuración"); save.setObjectName("primary"); save.clicked.connect(self.save_settings); box.addWidget(save, 0, Qt.AlignmentFlag.AlignLeft)
-        box.addWidget(_label("Una llegada se marca tarde cuando supera la hora de inicio más la tolerancia. El cambio se aplica a los marcajes futuros.", "muted"))
+        schedule_note = _label("Una llegada se marca tarde cuando supera la hora de inicio más la tolerancia. El cambio se aplica a los marcajes futuros.", "muted")
+        schedule_note.setWordWrap(True)
+        box.addWidget(schedule_note)
         self.schedule_status = _label("El horario debe confirmarse con la bodega antes de guardar.", "muted")
+        self.schedule_status.setWordWrap(True)
         box.addWidget(self.schedule_status)
         layout.addWidget(panel)
-        admin_panel = _panel()
-        admin_box = QVBoxLayout(admin_panel)
-        admin_box.setContentsMargins(22, 20, 22, 20)
-        admin_box.setSpacing(10)
-        admin_box.addWidget(_label("Permisos de administración", "sectionTitle"))
-        admin_box.addWidget(_label("El personal elige cargos del catálogo. Solo la clave administradora permite agregar cargos o eliminar trabajadores.", "muted"))
-        admin_row = QHBoxLayout()
-        self.admin_status = _label("", "muted")
-        admin_row.addWidget(self.admin_status, 1)
-        self.manage_roles_button = QPushButton("Administrar cargos")
+        roles_panel = _panel()
+        roles_box = QHBoxLayout(roles_panel)
+        roles_box.setContentsMargins(20, 15, 20, 15)
+        roles_box.addWidget(_label("Cargos de bodega", "sectionTitle"))
+        role_note = _label("Los cargos nuevos se comparten mediante MySQL.", "muted")
+        role_note.setWordWrap(True)
+        roles_box.addWidget(role_note, 1)
+        self.manage_roles_button = QPushButton("Editar cargos")
         self.manage_roles_button.setObjectName("primary")
         self.manage_roles_button.clicked.connect(self.manage_job_roles)
-        admin_row.addWidget(self.manage_roles_button)
-        admin_box.addLayout(admin_row)
-        layout.addWidget(admin_panel)
-        self.refresh_admin_status()
+        roles_box.addWidget(self.manage_roles_button)
+        layout.addWidget(roles_panel)
+
         update_panel = _panel()
         update_box = QVBoxLayout(update_panel)
-        update_box.setContentsMargins(22, 20, 22, 20)
-        update_box.setSpacing(10)
+        update_box.setContentsMargins(20, 15, 20, 15)
+        update_box.setSpacing(8)
         update_box.addWidget(_label("Actualizaciones", "sectionTitle"))
-        update_box.addWidget(_label("BODETIME comprueba versiones nuevas al abrirse y cada seis horas. La instalación conserva la base de datos.", "muted"))
+        update_note = _label("BODETIME comprueba versiones nuevas al abrirse y cada seis horas. La instalación conserva la base de datos.", "muted")
+        update_note.setWordWrap(True)
+        update_box.addWidget(update_note)
         update_row = QHBoxLayout()
         self.update_status = _label(f"Versión instalada: {APP_VERSION}", "muted")
         update_row.addWidget(self.update_status, 1)
@@ -1177,9 +1239,9 @@ class MainWindow(QMainWindow):
 
 def run_app(service: BodeTimeService, database_error: str | None = None) -> int:
     app = QApplication.instance() or QApplication([])
+    app.setOrganizationName("BODETIME")
     app.setApplicationName("BODETIME")
     app.setStyle("Fusion")
-    app.setStyleSheet(STYLESHEET)
     window = MainWindow(service, database_error)
     window.show()
     return app.exec()

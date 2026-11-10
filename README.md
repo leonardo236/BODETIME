@@ -13,7 +13,7 @@ La rúbrica de pre-defensa guía el alcance: interfaz PySide6 navegable con vali
 
 ## Preparación de MySQL
 
-1. Abre MySQL Workbench o el cliente `mysql` con una cuenta administradora.
+1. Abre MySQL Workbench o el cliente `mysql` con una cuenta que tenga permisos para preparar la base de datos.
 2. Ejecuta el archivo `schema.sql`. Este crea la base `bodetime`, el usuario `bodetime_app` y las tablas relacionales.
 3. Cambia la contraseña de ejemplo del usuario SQL por una clave propia y actualiza `DB_PASSWORD` en `.env` con la misma clave.
 4. En el proyecto, copia `.env.example` como `.env` y revisa host, puerto, base, usuario y contraseña.
@@ -28,11 +28,11 @@ La hora laboral y la tolerancia no se precargan con valores inventados. Al inici
 
 Al publicar una etiqueta `v*` en GitHub, Actions ejecuta las pruebas, empaqueta la aplicación y adjunta `BODETIME-Setup.exe` a la publicación. También se puede iniciar manualmente desde la pestaña **Actions**. El instalador crea accesos directos y ofrece un asistente para preparar la base MySQL y guardar credenciales de aplicación aleatorias en `%APPDATA%\BODETIME\.env`.
 
-**Requisito:** cada computadora debe tener MySQL Server 8 instalado y en ejecución. El asistente de BODETIME configura la base y la cuenta de aplicación, pero no instala el servidor MySQL. La contraseña administradora solo se usa durante esa configuración; no se guarda. No publiques `.env` ni credenciales en GitHub.
+**Requisito:** cada computadora debe tener MySQL Server 8 instalado y en ejecución. El asistente de BODETIME configura la base y la cuenta de aplicación, pero no instala el servidor MySQL. La contraseña de la cuenta de administración de MySQL solo se usa durante esa configuración; no se guarda. No publiques `.env` ni credenciales en GitHub.
 
 La aplicación comprueba si hay una versión más reciente al iniciar y cada seis horas. Cuando hay una, muestra el aviso dentro de BODETIME; **Actualizar ahora** descarga el instalador de GitHub, comprueba su SHA-256 y solicita confirmación antes de abrirlo. Windows puede pedir permiso de administrador. La base de datos y el archivo de configuración del usuario no forman parte de la actualización, y el asistente inicial de MySQL no vuelve a abrirse si esa configuración ya existe. Las versiones anteriores a la 1.0.4 deben instalar esta versión manualmente una primera vez; después recibirán los avisos dentro de la aplicación.
 
-La primera vez que se administran cargos o se elimina un trabajador, un administrador de Windows configura una clave de BODETIME de al menos 12 caracteres. Solo se guarda un hash PBKDF2 en el `.env` privado local. Después, la clave se pide para agregar cargos personalizados o eliminar trabajadores. Si no hay administrador configurado, abre BODETIME con **Ejecutar como administrador** para inicializarlo.
+Todos los usuarios pueden agregar cargos y eliminar trabajadores. Antes de borrar, BODETIME muestra una confirmación que indica cuántas asistencias históricas también se eliminarán.
 
 Abre PowerShell en esta carpeta:
 
@@ -55,13 +55,14 @@ La pantalla principal intenta conectar a MySQL al abrirse. Si el servidor no res
 ## Funciones
 
 - **Inicio:** recuento de trabajadores activos, asistencias del día, tardanzas y turnos abiertos; listado de marcajes del día.
-- **Trabajadores:** alta, consulta, edición de la fila seleccionada y desactivación/reactivación. El cargo se elige de un catálogo con puestos comunes de bodega; el administrador autenticado agrega cargos personalizados desde Configuración. El administrador puede eliminar definitivamente un trabajador con una segunda confirmación; también se borran sus asistencias históricas.
+- **Trabajadores:** alta, consulta, edición de la fila seleccionada y desactivación/reactivación. El cargo se elige de un catálogo con puestos comunes de bodega; cualquier usuario puede agregar cargos desde el botón **+ Cargo** o Configuración. Eliminar definitivamente a un trabajador pide confirmación y borra sus asistencias históricas.
 - **Asistencia:** entrada y salida con reloj del sistema; historial por rango de fechas y trabajador; rechazo de entradas diarias duplicadas, salida sin entrada y hora de salida no posterior a la entrada.
 - **Tardanzas:** se marcan cuando la entrada supera la hora de inicio más la tolerancia. Se evalúan con la configuración vigente al registrar la entrada.
 - **Reportes:** consulta de MySQL con fechas y trabajador opcional. El botón **Generar PDF** usa ReportLab (`Table`, `TableStyle`), pide ruta y permite abrir el archivo creado. Si no hay resultados, no crea un PDF vacío.
-- **Configuración:** hora de entrada y tolerancia, guardadas en MySQL.
+- **Configuración:** tema claro/oscuro, acento de color predeterminado o personalizado, animaciones, hora de entrada y tolerancia. La apariencia se guarda para la cuenta de Windows; el horario se guarda en MySQL.
 - **Actualizaciones:** comprobación de versiones publicadas, aviso integrado, descarga verificada y apertura del instalador de Windows.
-- **Cargos de bodega:** Almacenista, Auxiliar de bodega, Bodeguero, Despachador de bodega, Encargado de bodega, Montacarguista y Recepcionista de mercancía; se pueden añadir cargos propios con permisos de administrador.
+- **Cargos de bodega:** Almacenista, Auxiliar de bodega, Bodeguero, Despachador de bodega, Encargado de bodega, Montacarguista y Recepcionista de mercancía; cualquier usuario puede agregar opciones propias.
+- **Animaciones:** transiciones breves con temporizador preciso, sincronizadas con la frecuencia de la pantalla y limitadas a un máximo de 120 Hz cuando el equipo lo permite. Se pueden desactivar desde Configuración.
 
 ## Arquitectura
 
@@ -89,6 +90,8 @@ Así se reparten las tareas del código:
 - `bodetime/models.py`: describe las tablas como clases de Python.
 - `bodetime/database.py`: configura la conexión, las sesiones y las transacciones.
 - `bodetime/reports.py`: crea el PDF con la información consultada.
+- `bodetime/appearance.py`: crea la paleta clara/oscura y los colores de acento.
+- `bodetime/animations.py`: anima cambios de pantalla y valores según la frecuencia disponible.
 - `schema.sql`: contiene la estructura inicial de MySQL.
 
 Las claves de conexión se leen desde `.env`, que está excluido de Git. La tabla `asistencias` relaciona cada registro con un trabajador y limita la versión actual a una asistencia por persona y fecha.
@@ -105,7 +108,7 @@ Activa el entorno e invoca:
 pytest -q
 ```
 
-Las pruebas unitarias cubren las reglas de dominio y los formatos de datos de trabajadores, los mensajes de diagnóstico para errores de conexión de Windows, la protección de credenciales y la generación del PDF con una fila sintética. La integración con MySQL se verifica por separado y usa registros temporales que se eliminan al terminar.
+Las pruebas unitarias cubren validaciones, reglas de asistencia, estilos claro/oscuro, colores de selección, ritmo de animación y generación de PDF con datos sintéticos. La integración con MySQL se verifica por separado y usa registros temporales que se eliminan al terminar.
 
 ## Esquema y configuración
 
@@ -115,11 +118,10 @@ Variables soportadas en `.env`: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_
 
 ## Alcance de la verificación local
 
-En esta actualización, `pytest -q` reportó **32 pruebas aprobadas**, `compileall` terminó correctamente y `git diff --check` no encontró errores de formato. También se verificó la conexión real a MySQL con registros sintéticos temporales:
+En esta actualización, `pytest -q` reportó **34 pruebas aprobadas**, `compileall` terminó correctamente y `git diff --check` no encontró errores de formato. También se verificó la conexión real a MySQL con registros sintéticos temporales:
 
-- La consulta de conexión SQLAlchemy/PyMySQL y la aplicación pudieron leer la base MySQL. La ventana PySide6 quedó abierta y el panel confirmó el estado **MySQL conectado**.
-- La integración de esta versión comprobó crear un cargo personalizado y un trabajador ficticio, asociar una asistencia temporal, consultar el trabajador y su historial, borrar definitivamente el trabajador y la asistencia, y retirar el cargo. Los datos de prueba se limpiaron; no se consultó ni se modificó información real de trabajadores.
-- La interfaz PySide6 de esta versión no se verificó manualmente en una ventana completa. Las reglas de validación se probaron con la suite y la integración confirmó las operaciones correspondientes en MySQL.
+- La integración de esta versión creó un cargo y trabajador ficticios, asoció una asistencia temporal, consultó y eliminó el trabajador con su historial, y retiró el cargo. Todas las filas de prueba se limpiaron sin leer ni modificar datos reales.
+- Una comprobación PySide6 aislada confirmó el selector sin texto libre, las preferencias persistentes de tema y color, los controles de animación y el selector con estilos. No se hizo una sesión manual completa con información real en la ventana.
 - `git diff --check` terminó sin errores y se confirmó que `.env` y los entornos locales están excluidos de Git.
 
 El esquema y la interfaz se contrastaron con los cinco criterios de la rúbrica de pre-defensa. La plantilla JUDC aporta la estructura de exposición (introducción, objetivos, metodología, resultados y discusión, conclusiones), no criterios funcionales adicionales. Usa la configuración laboral y los datos autorizados por la bodega para la demostración.

@@ -11,7 +11,7 @@ INSTALACIÓN
 -----------
 1. Ejecuta BODETIME-Setup.exe y sigue el asistente.
 2. Deja marcada la opción “Configurar MySQL ahora”. Se abrirá el asistente.
-3. Escribe el usuario y la contraseña administradora de tu MySQL local.
+3. Escribe una cuenta MySQL con permisos para crear la base y el usuario de la aplicación.
    Esa contraseña solo se usa para crear la base y no se guarda.
 4. Pulsa “Probar y configurar”. BODETIME crea la base, las tablas, un usuario
    limitado con contraseña aleatoria y su configuración local protegida en

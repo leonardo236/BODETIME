@@ -33,7 +33,7 @@ class DatabaseSetupDialog(QDialog):
         layout = QVBoxLayout(self)
         intro = QLabel(
             "BODETIME necesita MySQL Server 8 instalado y en ejecución. "
-            "Ingresa la cuenta administradora local de MySQL; su contraseña "
+            "Ingresa una cuenta de MySQL con permisos para crear la base y el usuario de BODETIME. Su contraseña "
             "solo se usa para preparar la base y no se guarda."
         )
         intro.setWordWrap(True)
@@ -48,8 +48,8 @@ class DatabaseSetupDialog(QDialog):
         self.database_name = QLineEdit("bodetime")
         form.addRow("Servidor MySQL", self.host)
         form.addRow("Puerto", self.port)
-        form.addRow("Usuario administrador", self.admin_user)
-        form.addRow("Contraseña administrador", self.admin_password)
+        form.addRow("Usuario de configuración MySQL", self.admin_user)
+        form.addRow("Contraseña de esa cuenta MySQL", self.admin_password)
         form.addRow("Nombre de la base", self.database_name)
         layout.addLayout(form)
 
@@ -69,7 +69,7 @@ class DatabaseSetupDialog(QDialog):
         db_name = self.database_name.text().strip()
         admin_password = self.admin_password.text()
         if not host or not admin_user:
-            QMessageBox.warning(self, "Faltan datos", "Indica el servidor y el usuario administrador de MySQL.")
+            QMessageBox.warning(self, "Faltan datos", "Indica el servidor y una cuenta MySQL con permisos para configurar la base.")
             return
         if not is_valid_database_name(db_name):
             QMessageBox.warning(self, "Nombre no válido", "Usa solo letras, números y guion bajo en el nombre de la base.")
@@ -126,7 +126,7 @@ class DatabaseSetupDialog(QDialog):
             QMessageBox.information(
                 self, "Configuración completada",
                 "MySQL quedó configurado. Se crearon la base y las tablas; "
-                "la contraseña administradora no se guardó. Ya puedes abrir BODETIME.",
+                "la contraseña de configuración de MySQL no se guardó. Ya puedes abrir BODETIME.",
             )
             self.accept()
         except (SQLAlchemyError, OSError, RuntimeError) as exc:
