@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import QEasingCurve, QPointF, QPropertyAnimation, Qt
+from PySide6.QtCore import QEasingCurve, QPointF, QPropertyAnimation, QParallelAnimationGroup, QRect, Qt
 from PySide6.QtGui import QBrush, QColor, QLinearGradient, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (
     QFrame,
@@ -23,7 +23,8 @@ class SplashScreen(QWidget):
         self.animated = animated
         self.setObjectName("splashRoot")
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        self.setFixedSize(520, 330)
+        self.setMinimumSize(460, 290)
+        self.resize(520, 330)
         self.setWindowOpacity(0.0 if animated else 1.0)
 
         outer = QVBoxLayout(self)
@@ -91,7 +92,7 @@ class SplashScreen(QWidget):
         screen = self.screen()
         if screen is not None:
             self.move(screen.availableGeometry().center() - self.rect().center())
-        self._fade: QPropertyAnimation | None = None
+        self._transition: QParallelAnimationGroup | None = None
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
@@ -115,28 +116,61 @@ class SplashScreen(QWidget):
         self.status.setText(text)
 
     def animate_in(self) -> None:
+        screen = self.screen()
+        if screen is not None:
+            self.move(screen.availableGeometry().center() - self.rect().center())
+        target = self.geometry()
+        initial_width = round(target.width() * 0.94)
+        initial_height = round(target.height() * 0.94)
+        initial = QRect(
+            target.center().x() - initial_width // 2,
+            target.center().y() - initial_height // 2 + 8,
+            initial_width,
+            initial_height,
+        )
+        self.setGeometry(initial)
+        self.setWindowOpacity(0.0 if self.animated else 1.0)
         self.show()
         if not self.animated:
             return
-        self._fade = QPropertyAnimation(self, b"windowOpacity", self)
-        self._fade.setDuration(360)
-        self._fade.setStartValue(0.0)
-        self._fade.setEndValue(1.0)
-        self._fade.setEasingCurve(QEasingCurve.Type.OutCubic)
-        self._fade.start()
+        self._transition = QParallelAnimationGroup(self)
+        geometry = QPropertyAnimation(self, b"geometry", self._transition)
+        geometry.setDuration(460)
+        geometry.setStartValue(initial)
+        geometry.setEndValue(target)
+        geometry.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._transition.addAnimation(geometry)
+        opacity = QPropertyAnimation(self, b"windowOpacity", self._transition)
+        opacity.setDuration(350)
+        opacity.setStartValue(0.0)
+        opacity.setEndValue(1.0)
+        opacity.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._transition.addAnimation(opacity)
+        self._transition.start()
 
     def fade_out(self) -> None:
         if not self.isVisible():
             return
-        if self._fade is not None:
-            self._fade.stop()
+        if self._transition is not None:
+            self._transition.stop()
         if not self.animated:
             self.close()
             return
-        self._fade = QPropertyAnimation(self, b"windowOpacity", self)
-        self._fade.setDuration(230)
-        self._fade.setStartValue(self.windowOpacity())
-        self._fade.setEndValue(0.0)
-        self._fade.setEasingCurve(QEasingCurve.Type.InOutCubic)
-        self._fade.finished.connect(self.close)
-        self._fade.start()
+        start = self.geometry()
+        width, height = round(start.width() * 0.97), round(start.height() * 0.97)
+        end = QRect(start.center().x() - width // 2, start.center().y() - height // 2 + 5, width, height)
+        self._transition = QParallelAnimationGroup(self)
+        geometry = QPropertyAnimation(self, b"geometry", self._transition)
+        geometry.setDuration(230)
+        geometry.setStartValue(start)
+        geometry.setEndValue(end)
+        geometry.setEasingCurve(QEasingCurve.Type.InOutCubic)
+        self._transition.addAnimation(geometry)
+        opacity = QPropertyAnimation(self, b"windowOpacity", self._transition)
+        opacity.setDuration(210)
+        opacity.setStartValue(self.windowOpacity())
+        opacity.setEndValue(0.0)
+        opacity.setEasingCurve(QEasingCurve.Type.InOutCubic)
+        self._transition.addAnimation(opacity)
+        self._transition.finished.connect(self.close)
+        self._transition.start()

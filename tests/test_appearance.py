@@ -2,12 +2,13 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import QDate, QEventLoop, QSettings, QTimer, Qt
+from PySide6.QtCore import QDate, QEventLoop, QSettings, QTime, QTimer, Qt
 from PySide6.QtWidgets import QApplication, QLabel, QTableView
 
 from bodetime.animations import SmoothTween
 from bodetime.appearance import build_calendar_stylesheet, build_stylesheet
 from bodetime.calendar import GlassDateEdit
+from bodetime.clock import ClockFace
 from bodetime.splash import SplashScreen
 from bodetime.ui import MainWindow
 from bodetime.updater import ReleaseInfo
@@ -68,7 +69,8 @@ def test_calendar_date_field_keeps_qdateedit_api_and_selects_a_date():
     app.processEvents()
     assert picker.date() == selected
     picker.set_calendar_style("#3475A8", "classic", False)
-    assert "background: #FFFFFF" in popover.styleSheet()
+    assert popover.surface.calendar_style == "classic"
+    assert "background-color: #FFFFFF" in popover.styleSheet()
     picker.close()
     assert app is not None
 
@@ -77,8 +79,9 @@ def test_calendar_style_has_glass_and_classic_light_surfaces():
     assert "QCalendarWidget#glassCalendar" not in build_stylesheet("dark", "#16877B")
     glass = build_calendar_stylesheet("#4D9469", "glass")
     classic = build_calendar_stylesheet("#4D9469", "classic")
-    assert "background: #F7FAF9" in glass
-    assert "background: #FFFFFF" in classic
+    assert "background-color: #FBFCFB" in glass
+    assert "background-color: #FFFFFF" in classic
+    assert "QFrame#calendarSurface { background: transparent;" in glass
     assert "selection-background-color: #4d9469" in classic
 
 
@@ -103,13 +106,46 @@ def test_calendar_popup_and_date_grid_use_opaque_backgrounds():
     assert app is not None
 
 
+def test_glass_calendar_opens_with_smooth_expand_and_fade():
+    app = _app()
+    picker = GlassDateEdit(QDate(2026, 11, 9), animated=True)
+    picker.show()
+    picker.open_calendar()
+    app.processEvents()
+    popover = picker._popover
+    assert popover is not None and popover.isVisible()
+    assert popover._transition is not None
+    assert popover._transition.animationCount() == 2
+    mask_start = popover.mask().boundingRect()
+    assert mask_start.width() < popover.width()
+    loop = QEventLoop()
+    QTimer.singleShot(120, loop.quit)
+    loop.exec()
+    mask_middle = popover.mask().boundingRect()
+    assert mask_middle.width() > mask_start.width()
+    assert mask_middle.width() < popover.width()
+    popover.dismiss()
+    app.processEvents()
+    picker.close()
+
+
+def test_analog_clock_tracks_system_time_and_custom_accent():
+    clock = ClockFace("#3475A8")
+    time = QTime(8, 42, 17)
+    clock.set_time(time)
+    clock.set_accent("#4D9469")
+    assert clock.time == time
+    assert clock.accent.name() == "#4d9469"
+    assert clock.size().width() == 54
+
+
 def test_update_button_flow_starts_download_after_manual_search(tmp_path):
     app = _app()
     settings = QSettings(str(tmp_path / "preferences.ini"), QSettings.Format.IniFormat)
     window = MainWindow(object(), database_error="MySQL sin conexión", preferences=settings)
     release = ReleaseInfo(
-        version="1.0.8",
-        tag="v1.0.8",
+        version="1.0.10",
+        tag="v1.0.10",
         notes_url="https://example.invalid/release",
         installer_url="https://example.invalid/installer.exe",
         installer_sha256="0" * 64,
@@ -138,3 +174,19 @@ def test_splash_displays_bodetime_brand_and_can_close_without_animation():
     splash.fade_out()
     assert not splash.isVisible()
     assert app is not None
+
+
+def test_splash_entry_uses_a_soft_scale_and_fade():
+    app = _app()
+    splash = SplashScreen(animated=True)
+    splash.animate_in()
+    app.processEvents()
+    assert splash.isVisible()
+    assert splash._transition is not None
+    assert splash._transition.animationCount() == 2
+    assert splash.width() < 520
+    splash.fade_out()
+    loop = QEventLoop()
+    QTimer.singleShot(350, loop.quit)
+    loop.exec()
+    assert not splash.isVisible()

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import QEasingCurve, QDate, QLocale, QPoint, QRect, Qt, QParallelAnimationGroup, QPropertyAnimation, Signal
-from PySide6.QtGui import QColor, QPalette
+from PySide6.QtCore import QEasingCurve, QDate, QLocale, QPoint, QRect, QRectF, Qt, QParallelAnimationGroup, QPropertyAnimation, QVariantAnimation, Signal
+from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPainterPath, QPalette, QPen, QRegion
 from PySide6.QtWidgets import (
     QCalendarWidget,
     QDateEdit,
@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QWidget,
     QAbstractSpinBox,
     QApplication,
+    QGraphicsDropShadowEffect,
 )
 
 from .appearance import build_calendar_stylesheet
@@ -29,8 +30,50 @@ MONTHS = (
 )
 
 
+class CalendarSurface(QFrame):
+    """Superficie clara con brillo suave; el modo clásico queda blanco sólido."""
+
+    def __init__(self, style: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.calendar_style = style
+        self.setObjectName("calendarSurface")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setFrameShape(QFrame.Shape.NoFrame)
+
+    def set_calendar_style(self, style: str) -> None:
+        self.calendar_style = style
+        self.update()
+
+    def paintEvent(self, event) -> None:
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        rect = self.rect().adjusted(1, 1, -1, -1)
+        path = QPainterPath()
+        path.addRoundedRect(rect, 22, 22)
+        if self.calendar_style == "classic":
+            painter.fillPath(path, QColor("#FFFFFF"))
+            border = QColor("#E4EAE7")
+        else:
+            gradient = QLinearGradient(rect.topLeft(), rect.bottomRight())
+            gradient.setColorAt(0.0, QColor(255, 255, 255, 248))
+            gradient.setColorAt(0.48, QColor(245, 251, 249, 242))
+            gradient.setColorAt(1.0, QColor(226, 243, 239, 236))
+            painter.fillPath(path, gradient)
+            border = QColor(255, 255, 255, 244)
+            painter.save()
+            painter.setClipPath(path)
+            painter.setPen(QPen(QColor(255, 255, 255, 150), 1))
+            painter.drawLine(rect.left() + 18, rect.top() + 2, rect.right() - 18, rect.top() + 2)
+            painter.restore()
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setPen(QPen(border, 1))
+        painter.drawPath(path)
+        painter.end()
+
+
 class CalendarPopover(QDialog):
-    """Calendario blanco que aparece como una tarjeta flotante."""
+    """Calendario que aparece como una tarjeta flotante animada."""
 
     date_selected = Signal(QDate)
 
@@ -40,6 +83,7 @@ class CalendarPopover(QDialog):
         self.calendar_style = style
         self.animated = animated
         self._transition: QParallelAnimationGroup | None = None
+        self._reveal_scale = 1.0
         self._closing = False
         self.setObjectName("calendarPopover")
         # Solo las esquinas exteriores son transparentes; el calendario y su cuadrícula
@@ -49,10 +93,13 @@ class CalendarPopover(QDialog):
         self.setAutoFillBackground(False)
         self.setStyleSheet(build_calendar_stylesheet(accent, style))
 
-        surface = QFrame(self)
-        surface.setObjectName("calendarSurface")
-        surface.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        surface.setAutoFillBackground(True)
+        surface = CalendarSurface(style, self)
+        self.surface = surface
+        shadow = QGraphicsDropShadowEffect(surface)
+        shadow.setBlurRadius(18)
+        shadow.setOffset(0, 4)
+        shadow.setColor(QColor(18, 45, 48, 48))
+        surface.setGraphicsEffect(shadow)
 
         layout = QVBoxLayout(surface)
         layout.setContentsMargins(18, 16, 18, 14)
@@ -104,9 +151,9 @@ class CalendarPopover(QDialog):
         layout.addLayout(footer)
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(6, 6, 6, 6)
+        outer.setContentsMargins(12, 12, 12, 12)
         outer.addWidget(surface)
-        self.setFixedSize(376, 414)
+        self.setFixedSize(384, 422)
         self._update_month_label(self.calendar.yearShown(), self.calendar.monthShown())
 
     def _apply_calendar_palette(self) -> None:
@@ -150,27 +197,46 @@ class CalendarPopover(QDialog):
         y = min(max(y, available.top() + 8), available.bottom() - height - 8)
         target = QRect(x, y, width, height)
         self.setGeometry(target)
+        self.setWindowOpacity(0.0 if self.animated else 1.0)
+        if self.animated:
+            self._apply_reveal(0.88)
+        else:
+            self.clearMask()
         self.show()
         self.raise_()
         if not self.animated:
             return
-        inset = 0.94
-        initial_width, initial_height = round(width * inset), round(height * inset)
-        initial = QRect(
-            target.center().x() - initial_width // 2,
-            target.center().y() - initial_height // 2,
-            initial_width,
-            initial_height,
-        )
-        self.setGeometry(initial)
         self._transition = QParallelAnimationGroup(self)
-        geometry = QPropertyAnimation(self, b"geometry", self._transition)
-        geometry.setDuration(245)
-        geometry.setStartValue(initial)
-        geometry.setEndValue(target)
-        geometry.setEasingCurve(QEasingCurve.Type.OutCubic)
-        self._transition.addAnimation(geometry)
+        reveal = QVariantAnimation(self._transition)
+        reveal.setDuration(310)
+        reveal.setStartValue(0.88)
+        reveal.setEndValue(1.0)
+        reveal.setEasingCurve(QEasingCurve.Type.OutCubic)
+        reveal.valueChanged.connect(lambda value: self._apply_reveal(float(value)))
+        self._transition.addAnimation(reveal)
+        opacity = QPropertyAnimation(self, b"windowOpacity", self._transition)
+        opacity.setDuration(250)
+        opacity.setStartValue(0.0)
+        opacity.setEndValue(1.0)
+        opacity.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._transition.addAnimation(opacity)
+        self._transition.finished.connect(self.clearMask)
         self._transition.start()
+
+    def _apply_reveal(self, scale: float) -> None:
+        """Expande una máscara redondeada sin redimensionar la cuadrícula de fechas."""
+        self._reveal_scale = max(0.0, min(1.0, scale))
+        if self._reveal_scale >= 0.999:
+            self.clearMask()
+            return
+        rect = QRectF(self.rect())
+        inset_x = rect.width() * (1.0 - self._reveal_scale) / 2
+        inset_y = rect.height() * (1.0 - self._reveal_scale) / 2
+        rect.adjust(inset_x, inset_y, -inset_x, -inset_y)
+        path = QPainterPath()
+        radius = min(24.0, rect.width() * 0.08)
+        path.addRoundedRect(rect, radius, radius)
+        self.setMask(QRegion(path.toFillPolygon().toPolygon()))
 
     def _select_date(self, selected: QDate) -> None:
         self.date_selected.emit(selected)
@@ -188,24 +254,26 @@ class CalendarPopover(QDialog):
         self._closing = True
         if self._transition is not None:
             self._transition.stop()
-        start = self.geometry()
-        factor = 0.96
-        small_width, small_height = round(start.width() * factor), round(start.height() * factor)
-        end = QRect(
-            start.center().x() - small_width // 2,
-            start.center().y() - small_height // 2,
-            small_width,
-            small_height,
-        )
         self._transition = QParallelAnimationGroup(self)
-        geometry = QPropertyAnimation(self, b"geometry", self._transition)
-        geometry.setDuration(145)
-        geometry.setStartValue(start)
-        geometry.setEndValue(end)
-        geometry.setEasingCurve(QEasingCurve.Type.InCubic)
-        self._transition.addAnimation(geometry)
-        self._transition.finished.connect(self.hide)
+        reveal = QVariantAnimation(self._transition)
+        reveal.setDuration(180)
+        reveal.setStartValue(self._reveal_scale)
+        reveal.setEndValue(0.94)
+        reveal.setEasingCurve(QEasingCurve.Type.InCubic)
+        reveal.valueChanged.connect(lambda value: self._apply_reveal(float(value)))
+        self._transition.addAnimation(reveal)
+        opacity = QPropertyAnimation(self, b"windowOpacity", self._transition)
+        opacity.setDuration(160)
+        opacity.setStartValue(self.windowOpacity())
+        opacity.setEndValue(0.0)
+        opacity.setEasingCurve(QEasingCurve.Type.InCubic)
+        self._transition.addAnimation(opacity)
+        self._transition.finished.connect(self._finish_dismiss)
         self._transition.start()
+
+    def _finish_dismiss(self) -> None:
+        self.clearMask()
+        self.hide()
 
     def hideEvent(self, event) -> None:
         if self._transition is not None and not self._closing:
@@ -267,6 +335,7 @@ class GlassDateEdit(QDateEdit):
             self._popover.calendar_style = style
             self._popover.animated = animated
             self._popover.setStyleSheet(build_calendar_stylesheet(accent, style))
+            self._popover.surface.set_calendar_style(style)
             self._popover._apply_calendar_palette()
 
     def open_calendar(self) -> None:
@@ -276,5 +345,6 @@ class GlassDateEdit(QDateEdit):
         else:
             self._popover.setStyleSheet(build_calendar_stylesheet(self.accent, self.calendar_style))
             self._popover.animated = self.animated
+            self._popover.surface.set_calendar_style(self.calendar_style)
             self._popover._apply_calendar_palette()
         self._popover.show_for(self, self.date())

@@ -103,7 +103,7 @@ QLabel#eyebrow {{ color: {accent}; font-size: 8pt; font-weight: 700; letter-spac
 QLabel#heroTitle {{ color: {accent_hover}; font-size: 20pt; font-weight: 700; }}
 QLabel#heroCaption, QLabel#insightLabel {{ color: {colors['muted']}; font-size: 9pt; }}
 QFrame#dashboardHero {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 rgba({QColor(colors['panel']).red()}, {QColor(colors['panel']).green()}, {QColor(colors['panel']).blue()}, 242), stop:0.72 {colors['soft']}, stop:1 rgba({QColor(accent).red()}, {QColor(accent).green()}, {QColor(accent).blue()}, 92)); border: 1px solid rgba({QColor(colors['border']).red()}, {QColor(colors['border']).green()}, {QColor(colors['border']).blue()}, 225); border-top: 1px solid rgba(255,255,255,0.82); border-radius: 22px; }}
-QFrame#heroClock {{ background: rgba({QColor(colors['panel']).red()}, {QColor(colors['panel']).green()}, {QColor(colors['panel']).blue()}, 175); border: 1px solid rgba(255,255,255,0.76); border-radius: 18px; }}
+QFrame#heroClock {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 rgba(255,255,255,184), stop:0.58 rgba({QColor(colors['panel']).red()}, {QColor(colors['panel']).green()}, {QColor(colors['panel']).blue()}, 158), stop:1 rgba({QColor(accent).red()}, {QColor(accent).green()}, {QColor(accent).blue()}, 31)); border: 1px solid rgba(255,255,255,194); border-top: 1px solid rgba(255,255,255,240); border-radius: 20px; }}
 QLabel#clockValue {{ color: {colors['text']}; font-size: 34pt; font-weight: 600; letter-spacing: 1px; }}
 QLabel#clockSeconds {{ color: {accent}; font-size: 13pt; font-weight: 700; padding-bottom: 5px; }}
 QLabel#clockCaption {{ color: {colors['muted']}; font-size: 8pt; font-weight: 650; letter-spacing: 0.9px; }}
@@ -143,7 +143,7 @@ QCalendarWidget QToolButton {{ background: {colors['header']}; color: {colors['t
 QCalendarWidget QAbstractItemView:enabled {{ color: {colors['text']}; selection-background-color: {accent}; selection-color: {accent_text}; }}
 QToolButton#calendarTrigger {{ background: {colors['soft']}; color: {accent}; border: 1px solid {colors['border']}; border-radius: 8px; padding: 3px; font-size: 12pt; }}
 QToolButton#calendarTrigger:hover {{ background: {colors['soft_hover']}; border-color: {accent}; }}
-QFrame#calendarSurface {{ background: rgba(255,255,255,244); border: 1px solid rgba(255,255,255,230); border-top: 1px solid white; border-radius: 22px; }}
+QFrame#calendarSurface {{ background: transparent; border: 0; border-radius: 22px; }}
 QLabel#calendarMonth {{ color: #24333A; font-size: 15pt; font-weight: 700; }}
 QLabel#calendarEyebrow {{ color: {accent}; font-size: 8pt; font-weight: 700; letter-spacing: 1px; }}
 """
@@ -155,20 +155,21 @@ def build_calendar_stylesheet(accent: str = "#16877B", style: str = "glass") -> 
     if not color.isValid():
         color = QColor("#16877B")
     accent = color.name()
-    # El fondo casi blanco conserva el acabado de vidrio sin dejar traslucir datos debajo.
-    surface = "#F7FAF9" if style == "glass" else "#FFFFFF"
-    border = "rgba(255,255,255,235)" if style == "glass" else "#E7EBE9"
+    # El calendario sigue siendo opaco para proteger el contraste; la tarjeta exterior
+    # aporta el brillo de cristal y el modo clásico queda blanco puro.
+    surface = "#FBFCFB" if style == "glass" else "#FFFFFF"
+    alternate = "#F4F7F5" if style == "glass" else "#F7F8F7"
     return f"""
 QDialog#calendarPopover {{ background: transparent; }}
-QFrame#calendarSurface {{ background: {surface}; border: 1px solid {border}; border-top: 1px solid white; border-radius: 22px; }}
+QFrame#calendarSurface {{ background: transparent; border: 0; border-radius: 22px; }}
 QLabel#calendarMonth {{ color: #26343A; font-family: 'Segoe UI'; font-size: 15pt; font-weight: 700; }}
 QLabel#calendarEyebrow {{ color: {accent}; font-family: 'Segoe UI'; font-size: 8pt; font-weight: 700; letter-spacing: 1px; }}
-QCalendarWidget#glassCalendar {{ background-color: #FBFCFB; color: #26343A; }}
-QCalendarWidget#glassCalendar QWidget {{ background-color: #FBFCFB; color: #26343A; alternate-background-color: #F4F7F5; }}
-QCalendarWidget#glassCalendar QTableView {{ background-color: #FBFCFB; border: 0; outline: none; selection-background-color: {accent}; selection-color: white; gridline-color: transparent; }}
-QCalendarWidget#glassCalendar QAbstractItemView:enabled {{ color: #26343A; background-color: #FBFCFB; selection-background-color: {accent}; selection-color: white; alternate-background-color: #F4F7F5; }}
-QCalendarWidget#glassCalendar QTableView QWidget#qt_scrollarea_viewport {{ background-color: #FBFCFB; }}
-QCalendarWidget#glassCalendar QTableView::item {{ padding: 5px; border: 0; border-radius: 0; background-color: #FBFCFB; color: #26343A; }}
+QCalendarWidget#glassCalendar {{ background-color: {surface}; color: #26343A; }}
+QCalendarWidget#glassCalendar QWidget {{ background-color: {surface}; color: #26343A; alternate-background-color: {alternate}; }}
+QCalendarWidget#glassCalendar QTableView {{ background-color: {surface}; border: 0; outline: none; selection-background-color: {accent}; selection-color: white; gridline-color: transparent; }}
+QCalendarWidget#glassCalendar QAbstractItemView:enabled {{ color: #26343A; background-color: {surface}; selection-background-color: {accent}; selection-color: white; alternate-background-color: {alternate}; }}
+QCalendarWidget#glassCalendar QTableView QWidget#qt_scrollarea_viewport {{ background-color: {surface}; }}
+QCalendarWidget#glassCalendar QTableView::item {{ padding: 5px; border: 0; border-radius: 0; background-color: {surface}; color: #26343A; }}
 QCalendarWidget#glassCalendar QTableView::item:hover {{ background-color: #EDF3F0; color: #26343A; border-radius: 9px; }}
 QCalendarWidget#glassCalendar QTableView::item:selected {{ background-color: {accent}; color: white; border-radius: 9px; }}
 QCalendarWidget#glassCalendar QHeaderView::section {{ background-color: #FBFCFB; color: #75837D; border: 0; padding: 6px; font-weight: 650; }}

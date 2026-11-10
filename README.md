@@ -62,7 +62,7 @@ La pantalla principal intenta conectar a MySQL al abrirse. Si el servidor no res
 - **Configuración:** tema claro/oscuro, acento de color predeterminado o personalizado, animaciones, estilo del calendario (cristal claro o blanco clásico), hora de entrada y tolerancia. La apariencia se guarda para la cuenta de Windows; el horario se guarda en MySQL.
 - **Actualizaciones:** comprobación de versiones publicadas, aviso integrado, descarga verificada y apertura del instalador de Windows.
 - **Cargos de bodega:** Almacenista, Auxiliar de bodega, Bodeguero, Despachador de bodega, Encargado de bodega, Montacarguista y Recepcionista de mercancía; cualquier usuario puede agregar opciones propias.
-- **Apariencia:** inicio animado con la marca BODETIME, reloj local con segundos y tarjeta de fecha, calendario flotante con aparición suave y estilos cristal claro o blanco clásico. Las transiciones son breves y se pueden desactivar desde Configuración.
+- **Apariencia:** inicio con aparición y acercamiento suave de la marca BODETIME; reloj analógico y digital con hora y fecha locales; calendario flotante que se expande al abrir y se desvanece al cerrar. En Configuración se puede elegir **Cristal claro** o **Blanco clásico**, cambiar el tema y el acento, y desactivar las animaciones.
 
 ## Arquitectura
 
@@ -92,8 +92,9 @@ Así se reparten las tareas del código:
 - `bodetime/reports.py`: crea el PDF con la información consultada.
 - `bodetime/appearance.py`: crea la paleta clara/oscura y los colores de acento.
 - `bodetime/animations.py`: ejecuta transiciones con el motor de animación de Qt.
-- `bodetime/calendar.py`: contiene el selector de fecha y su calendario flotante.
-- `bodetime/splash.py`: presenta la marca de BODETIME mientras se inicia la conexión.
+- `bodetime/calendar.py`: contiene el selector y la tarjeta flotante con estilo cristal o blanco clásico.
+- `bodetime/clock.py`: dibuja la esfera analógica que acompaña la hora digital del panel.
+- `bodetime/splash.py`: presenta la marca de BODETIME con una entrada animada mientras se inicia la conexión.
 - `schema.sql`: contiene la estructura inicial de MySQL.
 
 Las claves de conexión se leen desde `.env`, que está excluido de Git. La tabla `asistencias` relaciona cada registro con un trabajador y limita la versión actual a una asistencia por persona y fecha.
@@ -120,17 +121,16 @@ Variables soportadas en `.env`: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_
 
 ## Verificación local
 
-La actualización de apariencia se verificó en Windows con estas comprobaciones:
+La actualización de interfaz se verificó localmente con estas comprobaciones:
 
-- `pytest -q`: 38 pruebas aprobadas, incluyendo el fondo opaco del calendario, estilos, transiciones y el flujo de actualización simulado.
+- `pytest -q`: 41 pruebas aprobadas, incluyendo apariencia, selector de calendario, transiciones de entrada y salida y flujo de instalación de una actualización simulado.
 - `compileall` y `git diff --check`: completados sin errores.
-- MySQL: conexión de solo lectura comprobada con `SELECT 1`; no se consultaron ni modificaron datos de trabajadores durante esa comprobación.
-- Prueba manual de interfaz: BODETIME abrió con MySQL, mostró el panel y permitió navegar a Configuración y Asistencia. Se abrió el calendario desde el filtro.
-- GitHub Actions aprobó las 38 pruebas y publicó el instalador de Windows de la versión 1.0.8. El comprobador reconoció la publicación real como actualización de un cliente 1.0.7; no se descargó ni ejecutó el instalador ni se aceptó UAC durante esta revisión.
-- La corrección visual se verificó en Windows: la superficie y la cuadrícula del calendario pintan un fondo sólido; las esquinas quedan redondeadas y conservan la animación de expansión.
+- La prueba automatizada usa Qt en modo sin ventana; comprueba que el reloj dibujado siga la hora configurada y que el selector mantenga fondos legibles y opacos.
+- Esta revisión no crea, cambia ni elimina registros de trabajadores o asistencias.
+- La generación de instalador y la publicación de esta versión dependen de que GitHub Actions complete el flujo asociado a la etiqueta de versión.
 
 El esquema y la interfaz se contrastaron con los cinco criterios de la rúbrica de pre-defensa. La plantilla JUDC aporta la estructura de exposición (introducción, objetivos, metodología, resultados y discusión, conclusiones), no criterios funcionales adicionales. Usa la configuración laboral y los datos autorizados por la bodega para la demostración.
 
-La generación del PDF con filas leídas de MySQL se probó anteriormente con registros temporales sintéticos; no se comprobó manualmente el diálogo **Generar PDF** durante esta actualización.
+La generación del PDF con filas leídas de MySQL se probó anteriormente con registros temporales sintéticos; no se volvió a comprobar manualmente el diálogo **Generar PDF** durante esta actualización.
 
 La versión no integra biometría, RFID, nómina, vacaciones, sincronización remota ni turnos múltiples.

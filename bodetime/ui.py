@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 from .animations import SmoothTween
 from .appearance import ACCENT_PRESETS, build_stylesheet
 from .calendar import GlassDateEdit
+from .clock import ClockFace
 from .reports import generate_attendance_pdf
 from .splash import SplashScreen
 from .services import BodeTimeService, ValidationError, AttendanceRow
@@ -335,6 +336,8 @@ class MainWindow(QMainWindow):
         self.preferences.setValue("appearance/mode", self.theme_mode)
         self.preferences.setValue("appearance/accent", self.accent_color)
         self.preferences.sync()
+        if hasattr(self, "clock_face"):
+            self.clock_face.set_accent(self.accent_color)
         if hasattr(self, "accent_preview"):
             self.accent_preview.setText(f"Acento actual · {self.accent_color.upper()}")
         for picker in self.date_pickers:
@@ -515,6 +518,9 @@ class MainWindow(QMainWindow):
             QDesktopServices.openUrl(QUrl(self.latest_release.notes_url))
 
     def start_update_download(self) -> None:
+        if self._installer_download_task and self._installer_download_task.isRunning():
+            self.statusBar().showMessage("La actualización ya se está descargando.", 5000)
+            return
         release = self.latest_release
         if release is None:
             self.check_for_updates(manual=True)
@@ -528,6 +534,7 @@ class MainWindow(QMainWindow):
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
+        self.check_updates_button.setEnabled(False)
         self.update_now_button.setEnabled(False)
         self._update_progress_dialog = QProgressDialog("Descargando actualización verificada…", "Cancelar", 0, 100, self)
         self._update_progress_dialog.setWindowTitle("Actualización de BODETIME")
@@ -551,6 +558,7 @@ class MainWindow(QMainWindow):
             self._update_progress_dialog.deleteLater()
             self._update_progress_dialog = None
         self.update_now_button.setEnabled(True)
+        self.check_updates_button.setEnabled(True)
 
     def _update_download_ready(self, installer_path: str) -> None:
         self._close_update_progress()
@@ -688,6 +696,8 @@ class MainWindow(QMainWindow):
             months = ("ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE")
             self.hero_clock.setText(now.toString("HH:mm"))
             self.hero_seconds.setText(now.toString("ss"))
+            if hasattr(self, "clock_face"):
+                self.clock_face.set_time(now)
             self.hero_date.setText(f"{weekdays[today.weekday()]}  ·  {today.day} {months[today.month - 1]}")
 
     def _build_dashboard(self) -> None:
@@ -719,14 +729,19 @@ class MainWindow(QMainWindow):
         clock_panel.setGraphicsEffect(clock_shadow)
         clock_layout = QVBoxLayout(clock_panel); clock_layout.setContentsMargins(16, 9, 16, 9); clock_layout.setSpacing(0)
         clock_layout.addWidget(_label("HORA LOCAL · LEÓN", "clockCaption"), 0, Qt.AlignmentFlag.AlignRight)
-        clock_row = QHBoxLayout(); clock_row.setSpacing(4)
-        clock_row.addStretch(1)
+        clock_row = QHBoxLayout(); clock_row.setSpacing(8)
+        self.clock_face = ClockFace(self.accent_color)
+        clock_row.addWidget(self.clock_face, 0, Qt.AlignmentFlag.AlignVCenter)
+        clock_text = QVBoxLayout(); clock_text.setContentsMargins(0, 0, 0, 0); clock_text.setSpacing(0)
         self.hero_clock = _label("--:--", "clockValue"); self.hero_clock.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.hero_seconds = _label("00", "clockSeconds"); self.hero_seconds.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        clock_row.addWidget(self.hero_clock); clock_row.addWidget(self.hero_seconds, 0, Qt.AlignmentFlag.AlignBottom)
-        clock_layout.addLayout(clock_row)
+        digits = QHBoxLayout(); digits.setContentsMargins(0, 0, 0, 0); digits.setSpacing(2)
+        digits.addStretch(1); digits.addWidget(self.hero_clock); digits.addWidget(self.hero_seconds, 0, Qt.AlignmentFlag.AlignBottom)
+        clock_text.addLayout(digits)
         self.hero_date = _label("", "clockCaption"); self.hero_date.setAlignment(Qt.AlignmentFlag.AlignRight)
-        clock_layout.addWidget(self.hero_date)
+        clock_text.addWidget(self.hero_date)
+        clock_row.addLayout(clock_text, 1)
+        clock_layout.addLayout(clock_row)
         hero_layout.addWidget(clock_panel)
         layout.addWidget(hero)
 
@@ -1270,7 +1285,7 @@ class MainWindow(QMainWindow):
         update_box.setContentsMargins(20, 15, 20, 15)
         update_box.setSpacing(8)
         update_box.addWidget(_label("Actualizaciones", "sectionTitle"))
-        update_note = _label("BODETIME comprueba versiones nuevas al abrirse y cada seis horas. La instalación conserva la base de datos.", "muted")
+        update_note = _label("Buscar e instalar consulta las versiones publicadas y, si hay una nueva, descarga el instalador verificado para completar la actualización. Tus datos se conservan.", "muted")
         update_note.setWordWrap(True)
         update_box.addWidget(update_note)
         update_row = QHBoxLayout()
