@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 
 from .animations import SmoothTween
 from .appearance import ACCENT_PRESETS, apply_platform_font, build_stylesheet
-from .branding import ReportMark, report_icon
+from .branding import BrandMark, application_icon
 from .calendar import GlassDateEdit
 from .clock import ClockFace
 from .excel_reports import generate_attendance_xlsx
@@ -203,7 +203,7 @@ class MainWindow(QMainWindow):
         if app:
             apply_platform_font(app)
             app.setStyleSheet(build_stylesheet(self.theme_mode, self.accent_color))
-        self.setWindowIcon(report_icon(self.accent_color))
+        self.setWindowIcon(application_icon(self.accent_color))
         self.setWindowTitle("BODETIME | Control de asistencia")
         self.setMinimumSize(1120, 740)
         self.resize(1320, 820)
@@ -220,7 +220,7 @@ class MainWindow(QMainWindow):
         side.setSpacing(6)
         brand_row = QHBoxLayout()
         brand_row.setSpacing(12)
-        brand_mark = ReportMark(52, self.accent_color, "brandMark", self.sidebar)
+        brand_mark = BrandMark(52, self.accent_color, "brandMark", self.sidebar)
         self.brand_mark = brand_mark
         brand_row.addWidget(brand_mark)
         brand_names = QVBoxLayout(); brand_names.setSpacing(0)
@@ -355,7 +355,7 @@ class MainWindow(QMainWindow):
         app = QApplication.instance()
         if app:
             app.setStyleSheet(build_stylesheet(self.theme_mode, self.accent_color))
-        self.setWindowIcon(report_icon(self.accent_color))
+        self.setWindowIcon(application_icon(self.accent_color))
         if hasattr(self, "brand_mark"):
             self.brand_mark.set_accent(self.accent_color)
         if hasattr(self, "clock_face"):
@@ -368,7 +368,7 @@ class MainWindow(QMainWindow):
         if hasattr(self, "accent_preview"):
             self.accent_preview.setText(f"Acento actual · {self.accent_color.upper()}")
         for picker in self.date_pickers:
-            picker.set_calendar_style(self.accent_color, self.calendar_style, self.motion_enabled)
+            picker.set_calendar_style(self.accent_color, self.calendar_style, self.motion_enabled, self.theme_mode)
 
     def _on_theme_changed(self, _index: int) -> None:
         selected = self.theme_selector.currentData()
@@ -407,7 +407,7 @@ class MainWindow(QMainWindow):
         self.preferences.setValue("appearance/animations", enabled)
         self.preferences.sync()
         for picker in self.date_pickers:
-            picker.set_calendar_style(self.accent_color, self.calendar_style, enabled)
+            picker.set_calendar_style(self.accent_color, self.calendar_style, enabled, self.theme_mode)
         if enabled:
             return
         for tween in list(self._active_tweens):
@@ -429,7 +429,7 @@ class MainWindow(QMainWindow):
         self.preferences.setValue("appearance/calendar", style)
         self.preferences.sync()
         for picker in self.date_pickers:
-            picker.set_calendar_style(self.accent_color, style, self.motion_enabled)
+            picker.set_calendar_style(self.accent_color, style, self.motion_enabled, self.theme_mode)
 
     def _on_clock_style_changed(self, _index: int) -> None:
         style = self.clock_style_selector.currentData()
@@ -1042,6 +1042,7 @@ class MainWindow(QMainWindow):
             accent=self.accent_color,
             calendar_style=self.calendar_style,
             animated=self.motion_enabled,
+            theme_mode=self.theme_mode,
         )
         self.date_pickers.append(picker)
         return picker

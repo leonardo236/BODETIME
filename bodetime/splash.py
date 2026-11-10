@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .branding import ReportMark
+from .branding import BrandMark
 
 
 class SplashScreen(QWidget):
@@ -53,7 +53,7 @@ class SplashScreen(QWidget):
 
         brand = QHBoxLayout()
         brand.setSpacing(18)
-        mark = ReportMark(70, "#007AFF", "splashMark", card)
+        mark = BrandMark(70, "#007AFF", "splashMark", card)
         wordmark = QVBoxLayout()
         wordmark.setSpacing(1)
         eyebrow = QLabel("GESTIÓN DE ASISTENCIA")

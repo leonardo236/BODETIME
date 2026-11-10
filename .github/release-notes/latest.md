@@ -1,9 +1,8 @@
-## Novedades de BODETIME 1.1.0
+## Novedades de BODETIME 1.1.1
 
-- Se corrigieron los fondos de las pantallas y de Configuración para que respeten el tema claro u oscuro, y se suavizó el aspecto de los selectores de hora.
-- Se actualizó la marca de BODETIME con un símbolo vectorial minimalista de hoja de reporte, visible también en el icono de la ventana y la pantalla de inicio.
-- El panel ahora permite elegir entre reloj digital y analógico. La preferencia se guarda en este equipo y solo se muestra el estilo seleccionado.
-- Los reportes de asistencia pueden exportarse a PDF o Excel desde la aplicación. Ambos formatos parten de los datos consultados en MySQL y respetan el período y el filtro de trabajador.
-- Se renovaron los colores predeterminados con una base azul sistema y superficies claras, además de mejorar el contraste en temas, controles y elementos seleccionados.
+- El selector de calendario ahora queda junto al campo de fecha, ocupa menos espacio y adapta el acabado cristal al tema claro u oscuro.
+- Los campos de fecha vuelven a mostrar día, mes y año; se mantuvo el acceso al calendario con botón y teclado.
+- Se afinó la paleta predeterminada hacia superficies blancas y negras, con paneles translúcidos y acentos discretos.
+- BODETIME estrena un isotipo propio: un monograma B dibujado alrededor de una órbita de tiempo, visible en la aplicación, el icono de Windows y la pantalla de inicio.
 
 La actualización conserva la configuración local y los registros de la base de datos. El instalador se genera en Windows mediante GitHub Actions.

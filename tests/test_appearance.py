@@ -44,8 +44,8 @@ def test_light_theme_styles_combo_popup_and_selected_items():
 def test_dark_theme_uses_contrasting_popup_and_readable_text():
     stylesheet = build_stylesheet("dark", "#3475A8")
     assert "QComboBox QAbstractItemView" in stylesheet
-    assert "background: #252E39" in stylesheet
-    assert "color: #EEF2F7" in stylesheet
+    assert "background: #2C2C2E" in stylesheet
+    assert "color: #F5F5F7" in stylesheet
     assert "selection-color: #FFFFFF" in stylesheet
 
 
@@ -57,20 +57,31 @@ def test_invalid_accent_falls_back_to_safe_default():
 def test_default_appearance_uses_apple_inspired_system_blue_and_light_surface():
     stylesheet = build_stylesheet()
     assert "background: #007aff" in stylesheet
-    assert "background: #F3F5F8" in stylesheet
-    assert "QStackedWidget { background: #F3F5F8; border: 0; }" in stylesheet
+    assert "background: #F5F5F7" in stylesheet
+    assert "QStackedWidget { background: #F5F5F7; border: 0; }" in stylesheet
 
 
 def test_calendar_date_field_keeps_qdateedit_api_and_selects_a_date():
     app = _app()
+    app.setStyle("Fusion")
+    app.setStyleSheet(build_stylesheet())
     picker = GlassDateEdit(QDate(2026, 11, 9), animated=False)
     picker.resize(190, 42)
     picker.show()
+    app.processEvents()
+    assert picker.text() == "09/11/2026"
+    assert picker.lineEdit().text() == "09/11/2026"
+    assert picker.lineEdit().width() > 100
     picker.open_calendar()
     app.processEvents()
     popover = picker._popover
     assert popover is not None and popover.isVisible()
     assert popover.month_label.text() == "Noviembre 2026"
+    assert popover.month_label.autoFillBackground() is False
+    assert popover.findChild(QLabel, "calendarEyebrow").autoFillBackground() is False
+    anchor = picker.mapToGlobal(picker.rect().topLeft())
+    assert abs(popover.x() - anchor.x()) <= 8
+    assert popover.height() <= 360
     selected = QDate(2026, 12, 24)
     popover._select_date(selected)
     app.processEvents()
@@ -78,6 +89,9 @@ def test_calendar_date_field_keeps_qdateedit_api_and_selects_a_date():
     picker.set_calendar_style("#3475A8", "classic", False)
     assert popover.surface.calendar_style == "classic"
     assert "background-color: #FFFFFF" in popover.styleSheet()
+    picker.set_calendar_style("#3475A8", "glass", False, "dark")
+    assert "background-color: #1C1C1E" in popover.styleSheet()
+    assert popover.surface.theme_mode == "dark"
     picker.close()
     assert app is not None
 
@@ -86,10 +100,14 @@ def test_calendar_style_has_glass_and_classic_light_surfaces():
     assert "QCalendarWidget#glassCalendar" not in build_stylesheet("dark", "#16877B")
     glass = build_calendar_stylesheet("#4D9469", "glass")
     classic = build_calendar_stylesheet("#4D9469", "classic")
-    assert "background-color: #FBFCFB" in glass
+    assert "background-color: #FBFBFC" in glass
     assert "background-color: #FFFFFF" in classic
     assert "QFrame#calendarSurface { background: transparent;" in glass
+    assert "QLabel#calendarMonth, QLabel#calendarEyebrow { background: transparent; }" in glass
     assert "selection-background-color: #4d9469" in classic
+    dark = build_calendar_stylesheet("#3475A8", "glass", "dark")
+    assert "background-color: #1C1C1E" in dark
+    assert "color: #F5F5F7" in dark
 
 
 def test_calendar_popup_and_date_grid_use_opaque_backgrounds():
@@ -105,10 +123,12 @@ def test_calendar_popup_and_date_grid_use_opaque_backgrounds():
     assert calendar_view is not None
     assert calendar_view.viewport().testAttribute(Qt.WidgetAttribute.WA_StyledBackground)
     assert calendar_view.viewport().testAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent)
-    assert "#fbfcfb" in calendar_view.viewport().styleSheet()
+    assert "#fbfbfc" in calendar_view.viewport().styleSheet()
     picker.set_calendar_style("#3475A8", "classic", False)
     assert "#ffffff" in calendar_view.viewport().styleSheet()
     assert calendar_view.viewport().palette().color(calendar_view.viewport().backgroundRole()).name() == "#ffffff"
+    picker.set_calendar_style("#3475A8", "glass", False, "dark")
+    assert "#1c1c1e" in calendar_view.viewport().styleSheet()
     picker.close()
     assert app is not None
 
@@ -172,7 +192,7 @@ def test_legacy_default_accent_migrates_and_report_mark_sets_window_icon(tmp_pat
     assert window.accent_color.lower() == "#007aff"
     assert settings.value("appearance/accent") == "#007AFF"
     assert not window.windowIcon().isNull()
-    assert window.brand_mark.accessibleName() == "Logotipo BODETIME, hoja de reporte"
+    assert window.brand_mark.accessibleName() == "Marca BODETIME, monograma y dial de tiempo"
     window.close()
     app.processEvents()
 
@@ -192,8 +212,8 @@ def test_update_button_flow_starts_download_after_manual_search(tmp_path):
     settings = QSettings(str(tmp_path / "preferences.ini"), QSettings.Format.IniFormat)
     window = MainWindow(object(), database_error="MySQL sin conexión", preferences=settings)
     release = ReleaseInfo(
-        version="1.1.1",
-        tag="v1.1.1",
+        version="1.1.2",
+        tag="v1.1.2",
         notes_url="https://example.invalid/release",
         installer_url="https://example.invalid/installer.exe",
         installer_sha256="0" * 64,
