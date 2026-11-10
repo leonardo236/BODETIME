@@ -51,7 +51,7 @@ La pantalla principal intenta conectar a MySQL al abrirse. Si el servidor no res
 ## Funciones
 
 - **Inicio:** recuento de trabajadores activos, asistencias del día, tardanzas y turnos abiertos; listado de marcajes del día.
-- **Trabajadores:** alta, consulta, edición y desactivación lógica con confirmación. Código único; nombres, apellidos y código obligatorios.
+- **Trabajadores:** alta, consulta, edición de la fila seleccionada y desactivación/reactivación con confirmación. Valida código, nombres, apellidos, cargo y formato del teléfono; conserva asistencias al desactivar.
 - **Asistencia:** entrada y salida con reloj del sistema; historial por rango de fechas y trabajador; rechazo de entradas diarias duplicadas, salida sin entrada y hora de salida no posterior a la entrada.
 - **Tardanzas:** se marcan cuando la entrada supera la hora de inicio más la tolerancia. Se evalúan con la configuración vigente al registrar la entrada.
 - **Reportes:** consulta de MySQL con fechas y trabajador opcional. El botón **Generar PDF** usa ReportLab (`Table`, `TableStyle`), pide ruta y permite abrir el archivo creado. Si no hay resultados, no crea un PDF vacío.
@@ -99,7 +99,7 @@ Activa el entorno e invoca:
 pytest -q
 ```
 
-Las pruebas unitarias cubren las reglas de dominio, los mensajes de diagnóstico para errores de conexión de Windows y la protección de credenciales, además de la generación del PDF con una fila sintética identificada expresamente como fixture. La integración con MySQL se verifica por separado y usa registros temporales que se eliminan al terminar.
+Las pruebas unitarias cubren las reglas de dominio y los formatos de datos de trabajadores, los mensajes de diagnóstico para errores de conexión de Windows, la protección de credenciales y la generación del PDF con una fila sintética. La integración con MySQL se verifica por separado y usa registros temporales que se eliminan al terminar.
 
 ## Esquema y configuración
 
@@ -109,9 +109,8 @@ Variables soportadas en `.env`: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_
 
 ## Alcance de la verificación local
 
-En la configuración local revisada el 3 de noviembre de 2026 (MySQL 8, servicio Windows `MySQL80`, host `127.0.0.1`, puerto `3306`):
+En esta actualización (9 de noviembre de 2026), `pytest -q` reportó **17 pruebas aprobadas**, `compileall` terminó correctamente y `git diff --check` no encontró errores de formato. La conexión real a MySQL no se volvió a verificar como parte de esta actualización. En una revisión local anterior, el 3 de noviembre de 2026:
 
-- `python -m compileall -q bodetime main.py` terminó correctamente y la última ejecución de `pytest -q` reportó **8 pruebas aprobadas**.
 - La consulta de conexión SQLAlchemy/PyMySQL y la aplicación pudieron leer la base MySQL. La ventana PySide6 quedó abierta y el panel confirmó el estado **MySQL conectado**.
 - Una verificación de integración temporal comprobó alta, lectura, actualización, código duplicado, desactivación, entradas y salidas válidas, rechazo de marcajes inválidos o duplicados, historial y generación ReportLab con filas recuperadas de MySQL. Los registros temporales y el PDF se eliminaron y la configuración de horario previa se restauró. No se incluyeron datos personales en el repositorio.
 - `git diff --check` terminó sin errores y se confirmó que `.env` y los entornos locales están excluidos de Git.

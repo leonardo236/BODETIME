@@ -19,6 +19,35 @@ def test_worker_requires_code_and_name():
         BodeTimeService._clean_worker("", "Ana", "Pérez", "", "")
 
 
+def test_worker_fields_are_normalized_and_spanish_names_are_supported():
+    fields = BodeTimeService._clean_worker(" emp_08 ", "  José   María ", "D’Arce-Gómez", " Bodega  central ", "+505 8888-7777")
+    assert fields == {
+        "code": "EMP_08", "first_name": "José María", "last_name": "D’Arce-Gómez",
+        "role": "Bodega central", "phone": "+505 8888-7777",
+    }
+
+
+@pytest.mark.parametrize(
+    ("code", "first", "last", "role", "phone", "message"),
+    [
+        ("EMP; DROP TABLE trabajadores", "Ana", "Pérez", "Bodega", "88887777", "código"),
+        ("EMP-001", "Ana2", "Pérez", "Bodega", "88887777", "nombres"),
+        ("EMP-001", "Ana", "Pérez!", "Bodega", "88887777", "apellidos"),
+        ("EMP-001", "Ana", "Pérez", "Bodega<script>", "88887777", "cargo"),
+        ("EMP-001", "Ana", "Pérez", "Bodega", "teléfono123", "teléfono"),
+        ("EMP-001", "Ana", "Pérez", "Bodega", "1234", "teléfono"),
+    ],
+)
+def test_worker_rejects_invalid_field_formats(code, first, last, role, phone, message):
+    with pytest.raises(ValidationError, match=message):
+        BodeTimeService._clean_worker(code, first, last, role, phone)
+
+
+def test_worker_rejects_values_that_exceed_database_column_lengths():
+    with pytest.raises(ValidationError, match="80 caracteres"):
+        BodeTimeService._clean_worker("EMP-1", "A" * 81, "Pérez", "", "")
+
+
 def test_lateness_uses_configured_grace_period_inclusively():
     assert not is_late(time(8, 10), time(8, 0), 10)
     assert is_late(time(8, 10, 1), time(8, 0), 10)

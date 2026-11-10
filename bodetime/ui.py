@@ -3,8 +3,8 @@ from __future__ import annotations
 from datetime import date, timedelta
 from pathlib import Path
 
-from PySide6.QtCore import QEasingCurve, QPropertyAnimation, Qt, QTime, QTimer, QUrl
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QRegularExpression, Qt, QTime, QTimer, QUrl
+from PySide6.QtGui import QDesktopServices, QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QComboBox, QDateEdit, QFileDialog, QFrame,
     QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox, QProgressBar, QPushButton,
@@ -17,61 +17,61 @@ from .services import BodeTimeService, ValidationError, AttendanceRow
 
 
 STYLESHEET = """
-QWidget { font-family: 'Segoe UI'; font-size: 10pt; color: #26392E; }
-QMainWindow, QWidget#content { background: #F4F7F2; }
-QWidget#sidebar { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #173B32, stop:1 #102D27); }
-QFrame#brandMark { background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #9BCB70, stop:1 #62A66C); border: 1px solid #B3D68F; border-radius: 14px; }
+QWidget { font-family: 'Segoe UI'; font-size: 10pt; color: #303B35; }
+QMainWindow, QWidget#content { background: #F3F5F1; }
+QWidget#sidebar { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #354B41, stop:1 #2B4037); }
+QFrame#brandMark { background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #91B395, stop:1 #71967C); border: 1px solid #A8C5A8; border-radius: 14px; }
 QLabel#brandGlyph { color: white; font-size: 23pt; font-weight: 800; }
 QLabel#brand { color: white; font-size: 17pt; font-weight: 750; }
-QLabel#brandSub { color: #A8C0B0; font-size: 8pt; letter-spacing: 1px; }
-QLabel#navCaption { color: #829F8C; font-size: 8pt; font-weight: 700; letter-spacing: 1.2px; padding: 22px 12px 7px; }
-QFrame#sideRule { background: #315448; max-height: 1px; }
-QPushButton#nav { color: #CFDBD0; background: transparent; border: 0; border-left: 3px solid transparent; border-radius: 8px; text-align: left; padding: 12px 13px; font-size: 10.5pt; }
-QPushButton#nav:hover { color: white; background: #21483B; }
-QPushButton#nav[active="true"] { color: white; background: #2A6048; border-left: 3px solid #B5DB7F; font-weight: 650; }
-QLabel#pageTitle { color: #1A3C30; font-size: 24pt; font-weight: 750; }
-QLabel#muted { color: #718276; }
-QLabel#topContext { color: #788D7D; font-size: 8pt; font-weight: 700; letter-spacing: 1.1px; }
-QLabel#topDate { color: #365344; font-size: 9pt; font-weight: 600; padding: 8px 12px; background: #E7EEE4; border-radius: 8px; }
+QLabel#brandSub { color: #B8C8BD; font-size: 8pt; letter-spacing: 1px; }
+QLabel#navCaption { color: #A0B1A5; font-size: 8pt; font-weight: 700; letter-spacing: 1.2px; padding: 22px 12px 7px; }
+QFrame#sideRule { background: #52665B; max-height: 1px; }
+QPushButton#nav { color: #E0E7E1; background: transparent; border: 0; border-left: 3px solid transparent; border-radius: 8px; text-align: left; padding: 12px 13px; font-size: 10.5pt; }
+QPushButton#nav:hover { color: white; background: #40594C; }
+QPushButton#nav[active="true"] { color: white; background: #4A6757; border-left: 3px solid #B7CBAA; font-weight: 650; }
+QLabel#pageTitle { color: #2C4034; font-size: 24pt; font-weight: 750; }
+QLabel#muted { color: #718077; }
+QLabel#topContext { color: #78877D; font-size: 8pt; font-weight: 700; letter-spacing: 1.1px; }
+QLabel#topDate { color: #43594B; font-size: 9pt; font-weight: 600; padding: 8px 12px; background: #E7ECE5; border-radius: 8px; }
 QFrame#connectionBanner { background: #FFF4DF; border: 1px solid #F0D8A8; border-radius: 12px; }
 QLabel#bannerText { color: #75430C; padding: 9px 10px; }
 QPushButton#retryDatabase { background: #F6E4BD; color: #694000; margin: 5px; }
 QMessageBox { background: #FFFFFF; }
 QMessageBox QLabel { color: #26392E; min-width: 360px; }
 QMessageBox QPushButton { min-width: 76px; }
-QFrame#metricPanel, QWidget#panel { background: white; border: 1px solid #DFE8DD; border-radius: 12px; }
+QFrame#metricPanel, QWidget#panel { background: #FEFEFC; border: 1px solid #DEE4DC; border-radius: 12px; }
 QFrame#metricPanel { background: #FFFFFF; }
 QFrame#metricDivider { background: #E5ECE3; max-width: 1px; }
-QLabel#metricValue { color: #285A40; font-size: 24pt; font-weight: 750; }
-QLabel#metricLabel { color: #52685A; font-size: 9pt; font-weight: 650; }
+QLabel#metricValue { color: #456B54; font-size: 24pt; font-weight: 750; }
+QLabel#metricLabel { color: #596B5F; font-size: 9pt; font-weight: 650; }
 QLabel#metricHint { color: #89978C; font-size: 8pt; }
-QLabel#sectionTitle { color: #1E4132; font-size: 12pt; font-weight: 700; }
-QLabel#eyebrow { color: #4F815B; font-size: 8pt; font-weight: 700; letter-spacing: 1.2px; }
-QLabel#heroTitle { color: #244A35; font-size: 20pt; font-weight: 700; }
+QLabel#sectionTitle { color: #344D3D; font-size: 12pt; font-weight: 700; }
+QLabel#eyebrow { color: #66836D; font-size: 8pt; font-weight: 700; letter-spacing: 1.2px; }
+QLabel#heroTitle { color: #3A5945; font-size: 20pt; font-weight: 700; }
 QLabel#heroCaption { color: #687C6B; font-size: 10pt; }
-QFrame#dashboardHero { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #EFF5E9, stop:1 #E4EFE1); border: 1px solid #DCE8D6; border-radius: 13px; }
+QFrame#dashboardHero { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #EEF2E9, stop:1 #E6ECE5); border: 1px solid #DCE4D9; border-radius: 13px; }
 QFrame#heroClock { background: transparent; border: 0; }
-QLabel#clockValue { color: #28533B; font-size: 25pt; font-weight: 700; }
-QLabel#clockCaption { color: #66816D; font-size: 8pt; font-weight: 650; letter-spacing: 0.7px; }
+QLabel#clockValue { color: #45654E; font-size: 25pt; font-weight: 700; }
+QLabel#clockCaption { color: #6E8071; font-size: 8pt; font-weight: 650; letter-spacing: 0.7px; }
 QFrame#panelHeader { background: transparent; }
-QLabel#insightValue { color: #285A40; font-size: 21pt; font-weight: 750; }
+QLabel#insightValue { color: #456B54; font-size: 21pt; font-weight: 750; }
 QLabel#insightLabel { color: #687C6D; font-size: 9pt; }
-QProgressBar { background: #E7EEE4; border: 0; border-radius: 5px; height: 9px; text-align: center; }
-QProgressBar::chunk { background: #78AD65; border-radius: 5px; }
+QProgressBar { background: #E5EAE3; border: 0; border-radius: 5px; height: 9px; text-align: center; }
+QProgressBar::chunk { background: #8BAA8B; border-radius: 5px; }
 QLabel#insightNote { color: #7B8D7E; font-size: 8pt; }
-QLineEdit, QComboBox, QDateEdit, QTimeEdit, QSpinBox { background: white; border: 1px solid #D4DFD3; border-radius: 8px; padding: 9px 10px; min-height: 21px; selection-background-color: #6D9F5E; }
-QLineEdit:focus, QComboBox:focus, QDateEdit:focus, QTimeEdit:focus, QSpinBox:focus { border: 1px solid #6D9F5E; }
-QPushButton { background: #E7EEE4; border: 0; border-radius: 8px; padding: 10px 15px; color: #294638; font-weight: 650; }
-QPushButton:hover { background: #D9E6D5; }
-QPushButton:focus { border: 1px solid #9BC37B; }
-QPushButton#primary { background: #387A55; color: white; }
-QPushButton#primary:hover { background: #2E6848; }
+QLineEdit, QComboBox, QDateEdit, QTimeEdit, QSpinBox { background: #FEFEFC; border: 1px solid #D4DDD3; border-radius: 8px; padding: 9px 10px; min-height: 21px; selection-background-color: #8EA78D; }
+QLineEdit:focus, QComboBox:focus, QDateEdit:focus, QTimeEdit:focus, QSpinBox:focus { border: 1px solid #819B83; }
+QPushButton { background: #E8ECE6; border: 0; border-radius: 8px; padding: 10px 15px; color: #354B3D; font-weight: 650; }
+QPushButton:hover { background: #DDE5DC; }
+QPushButton:focus { border: 1px solid #9DB49B; }
+QPushButton#primary { background: #5B8067; color: white; }
+QPushButton#primary:hover { background: #4E705A; }
 QPushButton#danger { background: #FCE9E7; color: #A6312A; }
-QTableWidget { background: white; border: 1px solid #DFE8DD; border-radius: 10px; gridline-color: #EDF2EB; selection-background-color: #E0EEDB; selection-color: #244A35; alternate-background-color: #FAFCF9; outline: none; }
-QHeaderView::section { background: #F1F5EF; border: 0; border-bottom: 1px solid #DCE6D9; padding: 11px 9px; color: #687D6D; font-size: 8pt; font-weight: 700; }
-QTableWidget::item { padding: 9px 7px; border-bottom: 1px solid #EFF3ED; }
+QTableWidget { background: #FEFEFC; border: 1px solid #DEE4DC; border-radius: 10px; gridline-color: #EEF1EC; selection-background-color: #E4ECE3; selection-color: #344D3D; alternate-background-color: #FAFBF8; outline: none; }
+QHeaderView::section { background: #F0F3EE; border: 0; border-bottom: 1px solid #DCE3DA; padding: 11px 9px; color: #68786D; font-size: 8pt; font-weight: 700; }
+QTableWidget::item { padding: 9px 7px; border-bottom: 1px solid #EEF1EC; }
 QScrollBar:vertical { background: transparent; width: 8px; margin: 4px 1px; }
-QScrollBar::handle:vertical { background: #C4D3C1; border-radius: 4px; min-height: 30px; }
+QScrollBar::handle:vertical { background: #C5D0C4; border-radius: 4px; min-height: 30px; }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
 """
 
@@ -460,20 +460,27 @@ class MainWindow(QMainWindow):
         form.setContentsMargins(18, 16, 18, 16)
         form.addWidget(_label("Datos del trabajador", "sectionTitle"))
         fields = QHBoxLayout()
-        self.worker_code = QLineEdit(); self.worker_code.setPlaceholderText("Ej. EMP-001")
-        self.worker_first = QLineEdit(); self.worker_first.setPlaceholderText("Nombres *")
-        self.worker_last = QLineEdit(); self.worker_last.setPlaceholderText("Apellidos *")
-        self.worker_role = QLineEdit(); self.worker_role.setPlaceholderText("Cargo")
-        self.worker_phone = QLineEdit(); self.worker_phone.setPlaceholderText("Teléfono")
+        self.worker_code = QLineEdit(); self.worker_code.setPlaceholderText("Ej. EMP-001"); self.worker_code.setMaxLength(20)
+        self.worker_code.setValidator(QRegularExpressionValidator(QRegularExpression(r"[A-Za-z0-9_-]{0,20}"), self.worker_code))
+        self.worker_first = QLineEdit(); self.worker_first.setPlaceholderText("Nombres *"); self.worker_first.setMaxLength(80)
+        self.worker_first.setValidator(QRegularExpressionValidator(QRegularExpression(r"[\p{L}\p{M} .’'-]{0,80}"), self.worker_first))
+        self.worker_last = QLineEdit(); self.worker_last.setPlaceholderText("Apellidos *"); self.worker_last.setMaxLength(80)
+        self.worker_last.setValidator(QRegularExpressionValidator(QRegularExpression(r"[\p{L}\p{M} .’'-]{0,80}"), self.worker_last))
+        self.worker_role = QLineEdit(); self.worker_role.setPlaceholderText("Cargo"); self.worker_role.setMaxLength(80)
+        self.worker_role.setValidator(QRegularExpressionValidator(QRegularExpression(r"[\p{L}\p{M}\p{N}_ .,'’/&():-]{0,80}"), self.worker_role))
+        self.worker_phone = QLineEdit(); self.worker_phone.setPlaceholderText("Teléfono"); self.worker_phone.setMaxLength(30)
+        self.worker_phone.setValidator(QRegularExpressionValidator(QRegularExpression(r"\+?[0-9 ()-]{0,30}"), self.worker_phone))
+        self.worker_phone.setToolTip("Entre 7 y 15 dígitos; puedes usar +, espacios, guiones o paréntesis.")
         for field, caption in [(self.worker_code, "Código *"), (self.worker_first, "Nombres *"), (self.worker_last, "Apellidos *"), (self.worker_role, "Cargo"), (self.worker_phone, "Teléfono")]:
             group = QVBoxLayout(); group.addWidget(_label(caption, "muted")); group.addWidget(field); fields.addLayout(group, 1)
         form.addLayout(fields)
         buttons = QHBoxLayout()
         self.worker_save = QPushButton("Guardar trabajador"); self.worker_save.setObjectName("primary"); self.worker_save.clicked.connect(self.save_worker)
         clear = QPushButton("Limpiar"); clear.clicked.connect(self.clear_worker_form)
-        edit = QPushButton("Cargar selección"); edit.clicked.connect(self.load_selected_worker)
-        deactivate = QPushButton("Desactivar"); deactivate.setObjectName("danger"); deactivate.clicked.connect(self.deactivate_selected_worker)
-        for button in [self.worker_save, clear, edit, deactivate]: buttons.addWidget(button)
+        self.worker_edit = QPushButton("Editar seleccionado"); self.worker_edit.clicked.connect(self.load_selected_worker)
+        self.worker_status = QPushButton("Desactivar"); self.worker_status.setObjectName("danger"); self.worker_status.clicked.connect(self.toggle_selected_worker_status)
+        self.worker_edit.setEnabled(False); self.worker_status.setEnabled(False)
+        for button in [self.worker_save, clear, self.worker_edit, self.worker_status]: buttons.addWidget(button)
         buttons.addStretch(1)
         form.addLayout(buttons)
         layout.addWidget(panel)
@@ -485,7 +492,22 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(page)
 
     def _worker_selection_changed(self) -> None:
-        self.worker_save.setText("Guardar cambios" if self.workers_table.currentRow() >= 0 and self.editing_worker_id else "Guardar trabajador")
+        row = self.workers_table.currentRow()
+        selected_id = self.workers_table.item(row, 0).data(Qt.ItemDataRole.UserRole) if row >= 0 else None
+        if self.editing_worker_id is not None and selected_id != self.editing_worker_id:
+            # Never save an old worker's form after the user selects a different row.
+            self.editing_worker_id = None
+            for field in [self.worker_code, self.worker_first, self.worker_last, self.worker_role, self.worker_phone]:
+                field.clear()
+        self.worker_save.setText("Guardar cambios" if self.editing_worker_id is not None else "Guardar trabajador")
+        self.worker_edit.setEnabled(row >= 0)
+        self.worker_status.setEnabled(row >= 0)
+        if row >= 0:
+            active = self.workers_table.item(row, 5).text() == "Activo"
+            self.worker_status.setText("Desactivar" if active else "Reactivar")
+            self.worker_status.setObjectName("danger" if active else "primary")
+            self.worker_status.style().unpolish(self.worker_status)
+            self.worker_status.style().polish(self.worker_status)
 
     def refresh_workers(self, silent: bool = False) -> None:
         try:
@@ -500,6 +522,13 @@ class MainWindow(QMainWindow):
             self.set_database_error(self._error_detail(exc))
 
     def save_worker(self) -> None:
+        if self.editing_worker_id is not None:
+            row = self.workers_table.currentRow()
+            selected_id = self.workers_table.item(row, 0).data(Qt.ItemDataRole.UserRole) if row >= 0 else None
+            if selected_id != self.editing_worker_id:
+                self.clear_worker_form()
+                QMessageBox.warning(self, "Selección cambió", "Vuelve a cargar el trabajador que deseas editar antes de guardar.")
+                return
         values = (self.worker_code.text(), self.worker_first.text(), self.worker_last.text(), self.worker_role.text(), self.worker_phone.text())
         if self.editing_worker_id is None:
             worker = self._guard(self.service.create_worker, *values)
@@ -529,15 +558,27 @@ class MainWindow(QMainWindow):
             self.worker_role.setText(worker.role); self.worker_phone.setText(worker.phone or "")
             self.worker_save.setText("Guardar cambios")
 
-    def deactivate_selected_worker(self) -> None:
+    def toggle_selected_worker_status(self) -> None:
         row = self.workers_table.currentRow()
         if row < 0:
-            QMessageBox.warning(self, "Selecciona un registro", "Elige un trabajador para desactivarlo."); return
+            QMessageBox.warning(self, "Selecciona un registro", "Elige un trabajador de la tabla primero."); return
         worker_id = self.workers_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
         name = f"{self.workers_table.item(row, 1).text()} {self.workers_table.item(row, 2).text()}"
-        answer = QMessageBox.question(self, "Confirmar desactivación", f"¿Desactivar a {name}? Se conservarán sus asistencias históricas.", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
-        if answer == QMessageBox.StandardButton.Yes and self._guard(self.service.deactivate_worker, worker_id):
-            QMessageBox.information(self, "Operación completada", "El trabajador fue desactivado.")
+        is_active = self.workers_table.item(row, 5).text() == "Activo"
+        if is_active:
+            answer = QMessageBox.question(self, "Confirmar desactivación", f"¿Desactivar a {name}? Se conservarán sus asistencias históricas.", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+            operation = self.service.deactivate_worker
+            message = "El trabajador fue desactivado. Sus asistencias históricas se conservaron."
+        else:
+            answer = QMessageBox.question(self, "Confirmar reactivación", f"¿Reactivar a {name} para permitir nuevos marcajes?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+            operation = self.service.reactivate_worker
+            message = "El trabajador fue reactivado."
+        if self._guard(operation, worker_id):
+            QMessageBox.information(self, "Operación completada", message)
             self.clear_worker_form(); self.refresh_workers(); self.refresh_dashboard(); self.refresh_attendance_workers(); self.refresh_report_workers()
 
     def _build_attendance(self) -> None:

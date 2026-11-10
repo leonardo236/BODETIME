@@ -39,7 +39,7 @@ jobs:
       - name: Build installer
         shell: powershell
         run: |
-          $version = if ($env:GITHUB_REF_NAME -match '^v(\d+\.\d+\.\d+)$') { $Matches[1] } else { '1.0.1' }
+          $version = if ($env:GITHUB_REF_NAME -match '^v(\d+\.\d+\.\d+)$') { $Matches[1] } else { '1.0.3' }
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$version" installer\BODETIME.iss
           if ($LASTEXITCODE -ne 0) { throw "ISCC terminó con código $LASTEXITCODE" }
       - name: Upload installer artifact
@@ -52,3 +52,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: output/BODETIME-Setup.exe
+          body_path: .github/release-notes/latest.md
+          name: BODETIME ${{ github.ref_name }}

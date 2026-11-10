@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
+import re
+import unicodedata
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -52,21 +54,53 @@ class BodeTimeService:
 
     @staticmethod
     def _clean_worker(code: str, first_name: str, last_name: str, role: str, phone: str) -> dict[str, str | None]:
+        def clean_space(value: str) -> str:
+            return " ".join(unicodedata.normalize("NFC", value).split())
+
+        def valid_person_name(value: str) -> bool:
+            # Acepta letras Unicode y separadores habituales en nombres hispanos.
+            has_letter = False
+            previous_separator = True
+            for char in value:
+                category = unicodedata.category(char)
+                if category.startswith("L"):
+                    has_letter = True
+                    previous_separator = False
+                elif category.startswith("M") and not previous_separator:
+                    continue
+                elif char in " '-’.":
+                    if previous_separator:
+                        return False
+                    previous_separator = True
+                else:
+                    return False
+            return has_letter and not previous_separator
+
         fields = {
-            "code": code.strip().upper(),
-            "first_name": first_name.strip(),
-            "last_name": last_name.strip(),
-            "role": role.strip(),
-            "phone": phone.strip() or None,
+            "code": clean_space(code).upper(),
+            "first_name": clean_space(first_name),
+            "last_name": clean_space(last_name),
+            "role": clean_space(role),
+            "phone": clean_space(phone) or None,
         }
         if not fields["code"] or not fields["first_name"] or not fields["last_name"]:
             raise ValidationError("El código, los nombres y los apellidos son obligatorios.")
-        if len(fields["code"]) > 20:
-            raise ValidationError("El código no puede superar 20 caracteres.")
+        if not re.fullmatch(r"[A-Z0-9][A-Z0-9_-]{0,19}", fields["code"]):
+            raise ValidationError("El código debe tener hasta 20 caracteres: letras, números, guion o guion bajo; debe iniciar con letra o número.")
+        if not valid_person_name(fields["first_name"]):
+            raise ValidationError("Los nombres solo pueden incluir letras, espacios, guion, apóstrofo o punto.")
+        if not valid_person_name(fields["last_name"]):
+            raise ValidationError("Los apellidos solo pueden incluir letras, espacios, guion, apóstrofo o punto.")
         if len(fields["first_name"]) > 80 or len(fields["last_name"]) > 80:
             raise ValidationError("Los nombres y apellidos no pueden superar 80 caracteres.")
-        if len(fields["role"]) > 80 or (fields["phone"] and len(fields["phone"]) > 30):
-            raise ValidationError("El cargo admite 80 caracteres y el teléfono 30.")
+        role = fields["role"]
+        if len(role) > 80 or (role and not re.fullmatch(r"[\w .,'’/&():-]+", role, flags=re.UNICODE)):
+            raise ValidationError("El cargo admite hasta 80 caracteres y no puede contener símbolos inválidos.")
+        if fields["phone"]:
+            digits = re.sub(r"\D", "", fields["phone"])
+            if (len(fields["phone"]) > 30 or not re.fullmatch(r"\+?[0-9 ()-]+", fields["phone"])
+                    or not 7 <= len(digits) <= 15):
+                raise ValidationError("El teléfono debe tener entre 7 y 15 dígitos y puede incluir +, espacios, guiones o paréntesis.")
         return fields
 
     def list_workers(self, include_inactive: bool = True) -> list[Worker]:
@@ -117,6 +151,14 @@ class BodeTimeService:
             if worker is None:
                 raise ValidationError("El trabajador seleccionado ya no existe.")
             worker.active = False
+            return True
+
+    def reactivate_worker(self, worker_id: int) -> bool:
+        with self.database.session() as session:
+            worker = session.get(Worker, worker_id)
+            if worker is None:
+                raise ValidationError("El trabajador seleccionado ya no existe.")
+            worker.active = True
             return True
 
     def attendance_today(self, worker_id: int, now: datetime | None = None) -> Attendance | None:
