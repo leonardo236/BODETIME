@@ -14,6 +14,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .branding import ReportMark
+
 
 class SplashScreen(QWidget):
     """Ventana compacta translúcida que acompaña el inicio de BODETIME."""
@@ -32,15 +34,13 @@ class SplashScreen(QWidget):
         card = QFrame()
         card.setObjectName("splashCard")
         card.setStyleSheet("""
-            QFrame#splashCard { background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #122A3C, stop:0.55 #173D49, stop:1 #205B59); border: 1px solid rgba(255,255,255,100); border-top: 1px solid rgba(255,255,255,180); border-radius: 28px; }
-            QLabel#splashEyebrow { color: #A8D5C8; font: 700 9pt 'Segoe UI'; letter-spacing: 2px; }
-            QLabel#splashTitle { color: white; font: 700 27pt 'Segoe UI'; letter-spacing: 1px; }
-            QLabel#splashSubtitle { color: #BCD3D5; font: 10pt 'Segoe UI'; }
-            QLabel#splashStatus { color: #D6E6E4; font: 9pt 'Segoe UI'; }
-            QFrame#splashMark { background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #4BC5B3, stop:1 #7FCE9E); border: 1px solid rgba(255,255,255,180); border-radius: 20px; }
-            QLabel#splashGlyph { color: white; font: 800 30pt 'Segoe UI'; }
+            QFrame#splashCard { background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #10243A, stop:0.55 #163A59, stop:1 #205580); border: 1px solid rgba(255,255,255,100); border-top: 1px solid rgba(255,255,255,180); border-radius: 28px; }
+            QLabel#splashEyebrow { color: #B7D5F5; font-size: 9pt; font-weight: 700; letter-spacing: 2px; }
+            QLabel#splashTitle { color: white; font-size: 27pt; font-weight: 700; letter-spacing: 1px; }
+            QLabel#splashSubtitle { color: #C8D6E5; font-size: 10pt; }
+            QLabel#splashStatus { color: #DCE6F0; font-size: 9pt; }
             QProgressBar { max-height: 5px; background: rgba(235,255,250,42); border: 0; border-radius: 2px; }
-            QProgressBar::chunk { background: #8DE1C8; border-radius: 2px; }
+            QProgressBar::chunk { background: #80BEFF; border-radius: 2px; }
         """)
         shadow = QGraphicsDropShadowEffect(card)
         shadow.setBlurRadius(40)
@@ -53,15 +53,7 @@ class SplashScreen(QWidget):
 
         brand = QHBoxLayout()
         brand.setSpacing(18)
-        mark = QFrame()
-        mark.setObjectName("splashMark")
-        mark.setFixedSize(70, 70)
-        mark_layout = QVBoxLayout(mark)
-        mark_layout.setContentsMargins(0, 0, 0, 0)
-        glyph = QLabel("B")
-        glyph.setObjectName("splashGlyph")
-        glyph.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        mark_layout.addWidget(glyph)
+        mark = ReportMark(70, "#007AFF", "splashMark", card)
         wordmark = QVBoxLayout()
         wordmark.setSpacing(1)
         eyebrow = QLabel("GESTIÓN DE ASISTENCIA")
@@ -100,15 +92,15 @@ class SplashScreen(QWidget):
         gloss = QLinearGradient(10, 10, self.width() - 10, self.height() - 10)
         gloss.setColorAt(0.0, QColor(255, 255, 255, 24))
         gloss.setColorAt(0.38, QColor(255, 255, 255, 0))
-        gloss.setColorAt(1.0, QColor(116, 237, 211, 16))
+        gloss.setColorAt(1.0, QColor(128, 190, 255, 18))
         path = QPainterPath()
         path.addRoundedRect(8, 8, self.width() - 16, self.height() - 16, 31, 31)
         painter.fillPath(path, QBrush(gloss))
         painter.setPen(QPen(QColor(255, 255, 255, 35), 1))
         painter.drawPath(path)
         flare = QLinearGradient(QPointF(0, 0), QPointF(self.width(), self.height()))
-        flare.setColorAt(0.0, QColor(122, 244, 216, 18))
-        flare.setColorAt(0.6, QColor(122, 244, 216, 0))
+        flare.setColorAt(0.0, QColor(128, 190, 255, 20))
+        flare.setColorAt(0.6, QColor(128, 190, 255, 0))
         flare.setColorAt(1.0, QColor(108, 173, 255, 20))
         painter.fillRect(self.rect(), QBrush(flare))
 

@@ -1,6 +1,6 @@
 # BODETIME
 
-Aplicación de escritorio en español para gestionar trabajadores, registrar asistencia y generar reportes PDF. Está construida con Python, PySide6, SQLAlchemy ORM 2.x, MySQL 8, PyMySQL y ReportLab.
+Aplicación de escritorio en español para gestionar trabajadores, registrar asistencia y generar reportes PDF y Excel. Está construida con Python, PySide6, SQLAlchemy ORM 2.x, MySQL 8, PyMySQL, ReportLab y openpyxl.
 
 La rúbrica de pre-defensa guía el alcance: interfaz PySide6 navegable con validaciones visibles, CRUD mediante ORM sobre MySQL, marcajes con reglas de negocio y reporte PDF generado desde la interfaz con datos consultados en la base. Las diapositivas JUDC organizan la exposición en introducción, objetivos, metodología, resultados y discusión, y conclusiones.
 
@@ -58,11 +58,11 @@ La pantalla principal intenta conectar a MySQL al abrirse. Si el servidor no res
 - **Trabajadores:** alta, consulta, edición de la fila seleccionada y desactivación/reactivación. El cargo se elige de un catálogo con puestos comunes de bodega; cualquier usuario puede agregar cargos desde el botón **+ Cargo** o Configuración. Eliminar definitivamente a un trabajador pide confirmación y borra sus asistencias históricas.
 - **Asistencia:** entrada y salida con reloj del sistema; historial por rango de fechas y trabajador; rechazo de entradas diarias duplicadas, salida sin entrada y hora de salida no posterior a la entrada.
 - **Tardanzas:** se marcan cuando la entrada supera la hora de inicio más la tolerancia. Se evalúan con la configuración vigente al registrar la entrada.
-- **Reportes:** consulta de MySQL con fechas y trabajador opcional. El botón **Generar PDF** usa ReportLab (`Table`, `TableStyle`), pide ruta y permite abrir el archivo creado. Si no hay resultados, no crea un PDF vacío.
-- **Configuración:** tema claro/oscuro, acento de color predeterminado o personalizado, animaciones, estilo del calendario (cristal claro o blanco clásico), hora de entrada y tolerancia. La apariencia se guarda para la cuenta de Windows; el horario se guarda en MySQL.
+- **Reportes:** consulta de MySQL con fechas y trabajador opcional. **Generar PDF** usa ReportLab (`Table`, `TableStyle`) y **Generar Excel** crea un libro `.xlsx` filtrable. Ambos piden dónde guardar el documento y permiten abrirlo; sin resultados, no crean archivos vacíos.
+- **Configuración:** tema claro/oscuro, acento de color predeterminado o personalizado, animaciones, estilo del calendario (cristal claro o blanco clásico), reloj digital o analógico, hora de entrada y tolerancia. La apariencia se guarda para la cuenta de Windows; el horario se guarda en MySQL.
 - **Actualizaciones:** comprobación de versiones publicadas, aviso integrado, descarga verificada y apertura del instalador de Windows.
 - **Cargos de bodega:** Almacenista, Auxiliar de bodega, Bodeguero, Despachador de bodega, Encargado de bodega, Montacarguista y Recepcionista de mercancía; cualquier usuario puede agregar opciones propias.
-- **Apariencia:** inicio con aparición y acercamiento suave de la marca BODETIME; reloj analógico y digital con hora y fecha locales; calendario flotante que se expande al abrir y se desvanece al cerrar. En Configuración se puede elegir **Cristal claro** o **Blanco clásico**, cambiar el tema y el acento, y desactivar las animaciones.
+- **Apariencia:** marca vectorial de hoja de reporte en la app y su icono, tipografía general del sistema, superficies y controles acordes al tema. La pantalla de inicio aparece suavemente; el reloj muestra el estilo elegido, con hora local y fecha; el calendario flotante se expande al abrir y se desvanece al cerrar. En Configuración se puede elegir **Cristal claro** o **Blanco clásico**, cambiar el tema y el acento, y desactivar las animaciones.
 
 ## Arquitectura
 
@@ -78,6 +78,7 @@ SQLAlchemy: modelos y sesiones (bodetime/models.py, bodetime/database.py)
 MySQL 8 (schema.sql)
 
 Consulta de asistencia → ReportLab (bodetime/reports.py) → archivo PDF
+                     ↘ openpyxl (bodetime/excel_reports.py) → archivo Excel
 ```
 
 En palabras sencillas: `main.py` abre la ventana. La pantalla recoge lo que hace el usuario y se lo pide a un servicio. El servicio valida la acción y usa una sesión de SQLAlchemy para leer o guardar en MySQL. Si una escritura falla, la transacción se revierte. Para un reporte, el servicio consulta las filas y ReportLab las presenta en una tabla PDF.
@@ -90,10 +91,12 @@ Así se reparten las tareas del código:
 - `bodetime/models.py`: describe las tablas como clases de Python.
 - `bodetime/database.py`: configura la conexión, las sesiones y las transacciones.
 - `bodetime/reports.py`: crea el PDF con la información consultada.
+- `bodetime/excel_reports.py`: crea un libro Excel filtrable desde las filas obtenidas del servicio.
+- `bodetime/branding.py`: dibuja el logotipo y el icono de la aplicación con vectores Qt.
 - `bodetime/appearance.py`: crea la paleta clara/oscura y los colores de acento.
 - `bodetime/animations.py`: ejecuta transiciones con el motor de animación de Qt.
 - `bodetime/calendar.py`: contiene el selector y la tarjeta flotante con estilo cristal o blanco clásico.
-- `bodetime/clock.py`: dibuja la esfera analógica que acompaña la hora digital del panel.
+- `bodetime/clock.py`: dibuja la esfera del reloj cuando se elige el estilo analógico.
 - `bodetime/splash.py`: presenta la marca de BODETIME con una entrada animada mientras se inicia la conexión.
 - `schema.sql`: contiene la estructura inicial de MySQL.
 
@@ -111,7 +114,7 @@ Activa el entorno e invoca:
 pytest -q
 ```
 
-Las pruebas unitarias cubren validaciones, reglas de asistencia, estilos claro/oscuro, selector de calendario, transiciones y generación de PDF con datos sintéticos. Las pruebas de interfaz usan Qt en modo sin ventana.
+Las pruebas unitarias cubren validaciones, reglas de asistencia, estilos claro/oscuro, selector de calendario, transiciones y generación de documentos PDF y Excel con datos sintéticos. Las pruebas de interfaz usan Qt en modo sin ventana.
 
 ## Esquema y configuración
 
@@ -121,17 +124,13 @@ Variables soportadas en `.env`: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_
 
 ## Verificación local
 
-La actualización de interfaz se verificó localmente con estas comprobaciones:
+En la actualización 1.1.0 se realizaron estas comprobaciones locales:
 
-- `pytest -q`: 41 pruebas aprobadas, incluyendo apariencia, selector de calendario, transiciones de entrada y salida y flujo de instalación de una actualización simulado.
+- `pytest -q`: 48 pruebas aprobadas, incluyendo apariencia, selección exclusiva del reloj, controles de horario, actualización simulada y el flujo de exportación Excel de la interfaz con un servicio de prueba.
 - `compileall` y `git diff --check`: completados sin errores.
-- La prueba automatizada usa Qt en modo sin ventana; comprueba que el reloj dibujado siga la hora configurada y que el selector mantenga fondos legibles y opacos.
-- Esta revisión no crea, cambia ni elimina registros de trabajadores o asistencias.
-- La interfaz se abrió en Windows con MySQL desconectado de forma deliberada; se comprobó el arranque, pero no se consultaron registros reales.
-- GitHub Actions aprobó las 41 pruebas y publicó el instalador de Windows de la versión 1.0.9. El comprobador reconoce esa publicación como nueva para un cliente 1.0.8 y valida que haya una suma SHA-256. No se descargó ni ejecutó el instalador ni se aceptó UAC durante esta revisión.
+- Se abrió una vista de BODETIME en Windows para inspeccionar Configuración y los modos de reloj, con MySQL desconectado de forma deliberada y un servicio de prueba. No se consultaron ni cambiaron registros reales.
+- Las pruebas de reporte comprueban el formato de los archivos con datos sintéticos. La lectura de registros reales desde MySQL y la exportación manual desde una base activa deben verificarse en el equipo donde el servidor esté disponible.
 
-El esquema y la interfaz se contrastaron con los cinco criterios de la rúbrica de pre-defensa. La plantilla JUDC aporta la estructura de exposición (introducción, objetivos, metodología, resultados y discusión, conclusiones), no criterios funcionales adicionales. Usa la configuración laboral y los datos autorizados por la bodega para la demostración.
-
-La generación del PDF con filas leídas de MySQL se probó anteriormente con registros temporales sintéticos; no se volvió a comprobar manualmente el diálogo **Generar PDF** durante esta actualización.
+El esquema y la interfaz se contrastaron con los cinco criterios de la rúbrica de pre-defensa. La plantilla JUDC aporta la estructura de exposición (introducción, objetivos, metodología, resultados y discusión, conclusiones), no criterios funcionales adicionales. Usa la configuración laboral y los datos autorizados por la bodega para la demostración. La compilación del instalador y su publicación se realizan en Windows mediante GitHub Actions al publicar una etiqueta `v*`.
 
 La versión no integra biometría, RFID, nómina, vacaciones, sincronización remota ni turnos múltiples.

@@ -3,7 +3,7 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QDate, QEventLoop, QSettings, QTime, QTimer, Qt
-from PySide6.QtWidgets import QApplication, QLabel, QTableView
+from PySide6.QtWidgets import QAbstractSpinBox, QApplication, QLabel, QTableView
 
 from bodetime.animations import SmoothTween
 from bodetime.appearance import build_calendar_stylesheet, build_stylesheet
@@ -44,14 +44,21 @@ def test_light_theme_styles_combo_popup_and_selected_items():
 def test_dark_theme_uses_contrasting_popup_and_readable_text():
     stylesheet = build_stylesheet("dark", "#3475A8")
     assert "QComboBox QAbstractItemView" in stylesheet
-    assert "background: #253840" in stylesheet
-    assert "color: #E8EFEB" in stylesheet
+    assert "background: #252E39" in stylesheet
+    assert "color: #EEF2F7" in stylesheet
     assert "selection-color: #FFFFFF" in stylesheet
 
 
 def test_invalid_accent_falls_back_to_safe_default():
     stylesheet = build_stylesheet("light", "not-a-color")
-    assert "background: #16877b" in stylesheet
+    assert "background: #007aff" in stylesheet
+
+
+def test_default_appearance_uses_apple_inspired_system_blue_and_light_surface():
+    stylesheet = build_stylesheet()
+    assert "background: #007aff" in stylesheet
+    assert "background: #F3F5F8" in stylesheet
+    assert "QStackedWidget { background: #F3F5F8; border: 0; }" in stylesheet
 
 
 def test_calendar_date_field_keeps_qdateedit_api_and_selects_a_date():
@@ -139,13 +146,54 @@ def test_analog_clock_tracks_system_time_and_custom_accent():
     assert clock.size().width() == 54
 
 
+def test_clock_mode_can_switch_without_showing_both_styles(tmp_path):
+    app = _app()
+    settings = QSettings(str(tmp_path / "clock-preferences.ini"), QSettings.Format.IniFormat)
+    window = MainWindow(object(), database_error="MySQL sin conexión", preferences=settings)
+    assert window.clock_style == "digital"
+    assert window.clock_face.isHidden()
+    assert not window.hero_clock.isHidden()
+    window.clock_style_selector.setCurrentIndex(window.clock_style_selector.findData("analog"))
+    assert window.clock_face.isHidden() is False
+    assert window.hero_clock.isHidden()
+    assert settings.value("appearance/clock") == "analog"
+    window.clock_style_selector.setCurrentIndex(window.clock_style_selector.findData("digital"))
+    assert window.clock_face.isHidden()
+    assert not window.hero_clock.isHidden()
+    window.close()
+    app.processEvents()
+
+
+def test_legacy_default_accent_migrates_and_report_mark_sets_window_icon(tmp_path):
+    app = _app()
+    settings = QSettings(str(tmp_path / "legacy-preferences.ini"), QSettings.Format.IniFormat)
+    settings.setValue("appearance/accent", "#16877B")
+    window = MainWindow(object(), database_error="MySQL sin conexión", preferences=settings)
+    assert window.accent_color.lower() == "#007aff"
+    assert settings.value("appearance/accent") == "#007AFF"
+    assert not window.windowIcon().isNull()
+    assert window.brand_mark.accessibleName() == "Logotipo BODETIME, hoja de reporte"
+    window.close()
+    app.processEvents()
+
+
+def test_schedule_fields_use_clean_flat_inputs_without_legacy_spinner_borders(tmp_path):
+    app = _app()
+    settings = QSettings(str(tmp_path / "flat-inputs.ini"), QSettings.Format.IniFormat)
+    window = MainWindow(object(), database_error="MySQL sin conexión", preferences=settings)
+    assert window.schedule_time.buttonSymbols() == QAbstractSpinBox.ButtonSymbols.NoButtons
+    assert window.schedule_tolerance.buttonSymbols() == QAbstractSpinBox.ButtonSymbols.NoButtons
+    window.close()
+    app.processEvents()
+
+
 def test_update_button_flow_starts_download_after_manual_search(tmp_path):
     app = _app()
     settings = QSettings(str(tmp_path / "preferences.ini"), QSettings.Format.IniFormat)
     window = MainWindow(object(), database_error="MySQL sin conexión", preferences=settings)
     release = ReleaseInfo(
-        version="1.0.10",
-        tag="v1.0.10",
+        version="1.1.1",
+        tag="v1.1.1",
         notes_url="https://example.invalid/release",
         installer_url="https://example.invalid/installer.exe",
         installer_sha256="0" * 64,
@@ -161,6 +209,7 @@ def test_update_button_flow_starts_download_after_manual_search(tmp_path):
     assert window.latest_release == release
     assert not window.update_banner.isHidden()
     assert install_started == [True]
+    assert window.generate_excel_button.text() == "Generar Excel"
     window.close()
     app.processEvents()
 

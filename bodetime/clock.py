@@ -10,7 +10,7 @@ from PySide6.QtWidgets import QWidget
 class ClockFace(QWidget):
     """Dibuja una esfera ligera que usa la hora local del sistema."""
 
-    def __init__(self, accent: str = "#16877B", parent: QWidget | None = None) -> None:
+    def __init__(self, accent: str = "#007AFF", parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.accent = QColor(accent)
         self.time = QTime.currentTime()
@@ -56,8 +56,8 @@ class ClockFace(QWidget):
         hour_angle = ((self.time.hour() % 12) + self.time.minute() / 60) * 30
         minute_angle = (self.time.minute() + self.time.second() / 60) * 6
         second_angle = self.time.second() * 6
-        self._draw_hand(painter, hour_angle, radius * 0.43, QColor("#183B3D"), 3.2)
-        self._draw_hand(painter, minute_angle, radius * 0.65, QColor("#275B59"), 2.2)
+        self._draw_hand(painter, hour_angle, radius * 0.43, QColor("#263B53"), 3.2)
+        self._draw_hand(painter, minute_angle, radius * 0.65, QColor("#38516D"), 2.2)
         self._draw_hand(painter, second_angle, radius * 0.72, self.accent, 1.1)
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(self.accent)

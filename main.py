@@ -22,6 +22,7 @@ if "--configurar-base" in sys.argv:
 
 from bodetime.config import get_settings
 from bodetime.database import Database
+from bodetime.appearance import apply_platform_font
 from bodetime.services import BodeTimeService
 from bodetime.splash import SplashScreen
 from bodetime.ui import run_app
@@ -50,6 +51,7 @@ def main() -> int:
     app.setOrganizationName("BODETIME")
     app.setApplicationName("BODETIME")
     app.setStyle("Fusion")
+    apply_platform_font(app)
     preferences = QSettings("BODETIME", "BODETIME")
     animated = preferences.value("appearance/animations", True, type=bool)
     splash = SplashScreen(animated=animated)

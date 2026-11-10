@@ -7,7 +7,7 @@ from pathlib import Path
 from PySide6.QtCore import QDate, QRegularExpression, QSettings, Qt, QTime, QTimer, QUrl
 from PySide6.QtGui import QColor, QDesktopServices, QRegularExpressionValidator
 from PySide6.QtWidgets import (
-    QAbstractItemView, QApplication, QCheckBox, QColorDialog, QComboBox,
+    QAbstractItemView, QAbstractSpinBox, QApplication, QCheckBox, QColorDialog, QComboBox,
     QDialog, QFileDialog, QFrame, QGraphicsDropShadowEffect, QGraphicsOpacityEffect, QHBoxLayout, QInputDialog,
     QLabel, QLineEdit, QListWidget, QMainWindow, QMessageBox, QProgressBar,
     QPushButton, QProgressDialog, QScrollArea, QSpinBox, QStackedWidget, QTableWidget,
@@ -15,9 +15,11 @@ from PySide6.QtWidgets import (
 )
 
 from .animations import SmoothTween
-from .appearance import ACCENT_PRESETS, build_stylesheet
+from .appearance import ACCENT_PRESETS, apply_platform_font, build_stylesheet
+from .branding import ReportMark, report_icon
 from .calendar import GlassDateEdit
 from .clock import ClockFace
+from .excel_reports import generate_attendance_xlsx
 from .reports import generate_attendance_pdf
 from .splash import SplashScreen
 from .services import BodeTimeService, ValidationError, AttendanceRow
@@ -41,6 +43,14 @@ def _panel() -> QWidget:
     shadow.setOffset(0, 7)
     shadow.setColor(QColor(20, 45, 48, 22))
     widget.setGraphicsEffect(shadow)
+    return widget
+
+
+def _page() -> QWidget:
+    """Crea una página sin fondo propio para que se vea la superficie principal."""
+    widget = QWidget()
+    widget.setObjectName("pageSurface")
+    widget.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
     return widget
 
 
@@ -165,12 +175,22 @@ class MainWindow(QMainWindow):
         self.theme_mode = str(self.preferences.value("appearance/mode", "light"))
         if self.theme_mode not in {"light", "dark"}:
             self.theme_mode = "light"
-        saved_accent = QColor(str(self.preferences.value("appearance/accent", "#16877B")))
-        self.accent_color = saved_accent.name() if saved_accent.isValid() else "#16877B"
+        saved_accent_value = self.preferences.value("appearance/accent")
+        if saved_accent_value is None or str(saved_accent_value).lower() == "#16877b":
+            self.accent_color = "#007AFF"
+            if saved_accent_value is not None:
+                self.preferences.setValue("appearance/accent", self.accent_color)
+                self.preferences.sync()
+        else:
+            saved_accent = QColor(str(saved_accent_value))
+            self.accent_color = saved_accent.name() if saved_accent.isValid() else "#007AFF"
         self.motion_enabled = self.preferences.value("appearance/animations", True, type=bool)
         self.calendar_style = str(self.preferences.value("appearance/calendar", "glass"))
         if self.calendar_style not in {"glass", "classic"}:
             self.calendar_style = "glass"
+        self.clock_style = str(self.preferences.value("appearance/clock", "digital"))
+        if self.clock_style not in {"digital", "analog"}:
+            self.clock_style = "digital"
         self.date_pickers: list[GlassDateEdit] = []
         self._active_tweens: set[SmoothTween] = set()
         self._widget_tweens: dict[QWidget, tuple[SmoothTween, QGraphicsOpacityEffect]] = {}
@@ -181,7 +201,9 @@ class MainWindow(QMainWindow):
         self._install_after_update_check = False
         app = QApplication.instance()
         if app:
+            apply_platform_font(app)
             app.setStyleSheet(build_stylesheet(self.theme_mode, self.accent_color))
+        self.setWindowIcon(report_icon(self.accent_color))
         self.setWindowTitle("BODETIME | Control de asistencia")
         self.setMinimumSize(1120, 740)
         self.resize(1320, 820)
@@ -198,8 +220,8 @@ class MainWindow(QMainWindow):
         side.setSpacing(6)
         brand_row = QHBoxLayout()
         brand_row.setSpacing(12)
-        brand_mark = QFrame(); brand_mark.setObjectName("brandMark"); brand_mark.setFixedSize(48, 48)
-        mark_layout = QVBoxLayout(brand_mark); mark_layout.setContentsMargins(0, 0, 0, 0); mark_layout.addWidget(_label("B", "brandGlyph"), 0, Qt.AlignmentFlag.AlignCenter)
+        brand_mark = ReportMark(52, self.accent_color, "brandMark", self.sidebar)
+        self.brand_mark = brand_mark
         brand_row.addWidget(brand_mark)
         brand_names = QVBoxLayout(); brand_names.setSpacing(0)
         brand_names.addWidget(_label("BODETIME", "brand")); brand_names.addWidget(_label("GESTIÓN DE ASISTENCIA", "brandSub"))
@@ -333,6 +355,11 @@ class MainWindow(QMainWindow):
         app = QApplication.instance()
         if app:
             app.setStyleSheet(build_stylesheet(self.theme_mode, self.accent_color))
+        self.setWindowIcon(report_icon(self.accent_color))
+        if hasattr(self, "brand_mark"):
+            self.brand_mark.set_accent(self.accent_color)
+        if hasattr(self, "clock_face"):
+            self.clock_face.set_accent(self.accent_color)
         self.preferences.setValue("appearance/mode", self.theme_mode)
         self.preferences.setValue("appearance/accent", self.accent_color)
         self.preferences.sync()
@@ -403,6 +430,23 @@ class MainWindow(QMainWindow):
         self.preferences.sync()
         for picker in self.date_pickers:
             picker.set_calendar_style(self.accent_color, style, self.motion_enabled)
+
+    def _on_clock_style_changed(self, _index: int) -> None:
+        style = self.clock_style_selector.currentData()
+        if style not in {"digital", "analog"}:
+            return
+        self.clock_style = style
+        self.preferences.setValue("appearance/clock", style)
+        self.preferences.sync()
+        self._apply_clock_style()
+
+    def _apply_clock_style(self) -> None:
+        if not hasattr(self, "clock_face"):
+            return
+        digital = self.clock_style == "digital"
+        self.clock_face.setVisible(not digital)
+        self.hero_clock.setVisible(digital)
+        self.hero_seconds.setVisible(digital)
 
     def _start_tween(self, setter, start: float, end: float, duration: int, on_finished=None) -> SmoothTween | None:
         if not self.motion_enabled:
@@ -701,7 +745,7 @@ class MainWindow(QMainWindow):
             self.hero_date.setText(f"{weekdays[today.weekday()]}  ·  {today.day} {months[today.month - 1]}")
 
     def _build_dashboard(self) -> None:
-        page = QWidget()
+        page = _page()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(13)
@@ -742,6 +786,7 @@ class MainWindow(QMainWindow):
         clock_text.addWidget(self.hero_date)
         clock_row.addLayout(clock_text, 1)
         clock_layout.addLayout(clock_row)
+        self._apply_clock_style()
         hero_layout.addWidget(clock_panel)
         layout.addWidget(hero)
 
@@ -825,7 +870,7 @@ class MainWindow(QMainWindow):
             self.set_database_error(self._error_detail(exc))
 
     def _build_workers(self) -> None:
-        page = QWidget()
+        page = _page()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(_label("Trabajadores", "pageTitle"))
@@ -1050,7 +1095,7 @@ class MainWindow(QMainWindow):
         self.refresh_workers(); self.refresh_dashboard(); self.refresh_attendance_workers(); self.refresh_report_workers()
 
     def _build_attendance(self) -> None:
-        page = QWidget(); layout = QVBoxLayout(page); layout.setContentsMargins(0, 0, 0, 0)
+        page = _page(); layout = QVBoxLayout(page); layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(_label("Asistencia", "pageTitle"))
         layout.addWidget(_label("Los marcajes se registran con la hora del sistema y no se pueden duplicar en el día", "muted"))
         panel = _panel(); box = QHBoxLayout(panel); box.setContentsMargins(18, 15, 18, 15)
@@ -1126,9 +1171,9 @@ class MainWindow(QMainWindow):
             self.refresh_attendance_history(); self.refresh_dashboard()
 
     def _build_reports(self) -> None:
-        page = QWidget(); layout = QVBoxLayout(page); layout.setContentsMargins(0, 0, 0, 0)
+        page = _page(); layout = QVBoxLayout(page); layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(_label("Reportes", "pageTitle"))
-        layout.addWidget(_label("Consulta datos de MySQL y genera un PDF con los filtros aplicados", "muted"))
+        layout.addWidget(_label("Consulta MySQL y exporta los marcajes filtrados a PDF o Excel", "muted"))
         panel = _panel(); box = QVBoxLayout(panel); box.setContentsMargins(20, 20, 20, 20)
         box.addWidget(_label("Criterios del reporte", "sectionTitle"))
         filters = QHBoxLayout()
@@ -1139,10 +1184,17 @@ class MainWindow(QMainWindow):
             group = QVBoxLayout(); group.addWidget(_label(text, "muted")); group.addWidget(widget); filters.addLayout(group, 1)
         box.addLayout(filters)
         actions = QHBoxLayout(); actions.addStretch(1)
-        generate = QPushButton("Generar PDF"); generate.setObjectName("primary"); generate.clicked.connect(self.generate_report)
-        actions.addWidget(generate); box.addLayout(actions)
+        self.generate_excel_button = QPushButton("Generar Excel")
+        self.generate_excel_button.setObjectName("secondary")
+        self.generate_excel_button.clicked.connect(self.generate_excel_report)
+        self.generate_pdf_button = QPushButton("Generar PDF")
+        self.generate_pdf_button.setObjectName("primary")
+        self.generate_pdf_button.clicked.connect(self.generate_report)
+        actions.addWidget(self.generate_excel_button)
+        actions.addWidget(self.generate_pdf_button)
+        box.addLayout(actions)
         layout.addWidget(panel)
-        layout.addWidget(_label("El PDF incluye encabezados, período, filtro de trabajador y hora de generación.", "muted"))
+        layout.addWidget(_label("Los archivos incluyen encabezados, fechas, filtro de trabajador y hora de generación.", "muted"))
         self.stack.addWidget(page)
 
     def refresh_report_workers(self, silent: bool = False) -> None:
@@ -1156,17 +1208,27 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             self.set_database_error(self._error_detail(exc))
 
-    def generate_report(self) -> None:
+    def _report_data_for_export(self):
         start, end = self.report_start.date().toPython(), self.report_end.date().toPython()
         rows = self._guard(self.service.attendance_history, start, end, self.report_worker.currentData())
-        if rows is None: return
+        if rows is None:
+            return None
         if not rows:
-            QMessageBox.information(self, "Sin resultados", "No hay asistencias para esos filtros. No se generó un PDF vacío."); return
+            QMessageBox.information(self, "Sin resultados", "No hay asistencias para esos filtros. No se generó un archivo vacío.")
+            return None
+        worker_label = self.report_worker.currentText() if self.report_worker.currentData() is not None else "Todos"
+        return start, end, rows, worker_label
+
+    def generate_report(self) -> None:
+        report = self._report_data_for_export()
+        if report is None:
+            return
+        start, end, rows, worker_label = report
         suggested = Path.home() / "Documents" / f"BODETIME_asistencia_{start:%Y%m%d}_{end:%Y%m%d}.pdf"
         path, _ = QFileDialog.getSaveFileName(self, "Guardar reporte PDF", str(suggested), "Documento PDF (*.pdf)")
-        if not path: return
+        if not path:
+            return
         if not path.lower().endswith(".pdf"): path += ".pdf"
-        worker_label = self.report_worker.currentText() if self.report_worker.currentData() is not None else "Todos"
         try:
             result = generate_attendance_pdf(path, rows, start, end, worker_label)
         except Exception as exc:
@@ -1174,8 +1236,26 @@ class MainWindow(QMainWindow):
         answer = QMessageBox.information(self, "Reporte generado", f"Se generó el reporte con {len(rows)} registros.\n\n{result}\n\n¿Deseas abrirlo ahora?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.Yes)
         if answer == QMessageBox.StandardButton.Yes: QDesktopServices.openUrl(QUrl.fromLocalFile(str(result)))
 
+    def generate_excel_report(self) -> None:
+        report = self._report_data_for_export()
+        if report is None:
+            return
+        start, end, rows, worker_label = report
+        suggested = Path.home() / "Documents" / f"BODETIME_asistencia_{start:%Y%m%d}_{end:%Y%m%d}.xlsx"
+        path, _ = QFileDialog.getSaveFileName(self, "Guardar reporte Excel", str(suggested), "Libro de Excel (*.xlsx)")
+        if not path:
+            return
+        if not path.lower().endswith(".xlsx"):
+            path += ".xlsx"
+        try:
+            result = generate_attendance_xlsx(path, rows, start, end, worker_label)
+        except Exception as exc:
+            QMessageBox.critical(self, "Error al generar Excel", str(exc)); return
+        answer = QMessageBox.information(self, "Reporte Excel generado", f"Se exportaron {len(rows)} registros.\n\n{result}\n\n¿Deseas abrir el archivo ahora?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.Yes)
+        if answer == QMessageBox.StandardButton.Yes: QDesktopServices.openUrl(QUrl.fromLocalFile(str(result)))
+
     def _build_settings(self) -> None:
-        page = QWidget()
+        page = _page()
         page_layout = QVBoxLayout(page)
         page_layout.setContentsMargins(0, 0, 0, 0)
         page_layout.setSpacing(0)
@@ -1184,6 +1264,8 @@ class MainWindow(QMainWindow):
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         content = QWidget()
+        content.setObjectName("settingsContent")
+        content.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         layout = QVBoxLayout(content)
         layout.setContentsMargins(0, 0, 2, 0)
         scroll.setWidget(content)
@@ -1237,6 +1319,20 @@ class MainWindow(QMainWindow):
         calendar_note.setWordWrap(True)
         calendar_row.addWidget(calendar_note, 1, Qt.AlignmentFlag.AlignVCenter)
         appearance_box.addLayout(calendar_row)
+        clock_row = QHBoxLayout()
+        clock_group = QVBoxLayout()
+        clock_group.addWidget(_label("Estilo del reloj", "muted"))
+        self.clock_style_selector = QComboBox()
+        self.clock_style_selector.addItem("Digital", "digital")
+        self.clock_style_selector.addItem("Analógico", "analog")
+        self.clock_style_selector.setCurrentIndex(max(0, self.clock_style_selector.findData(self.clock_style)))
+        self.clock_style_selector.currentIndexChanged.connect(self._on_clock_style_changed)
+        clock_group.addWidget(self.clock_style_selector)
+        clock_row.addLayout(clock_group)
+        clock_note = _label("El panel muestra un solo estilo de reloj a la vez.", "muted")
+        clock_note.setWordWrap(True)
+        clock_row.addWidget(clock_note, 1, Qt.AlignmentFlag.AlignVCenter)
+        appearance_box.addLayout(clock_row)
         preview_row = QHBoxLayout()
         self.accent_preview = _label(f"Acento actual · {self.accent_color.upper()}", "accentPreview")
         self.accent_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -1255,7 +1351,9 @@ class MainWindow(QMainWindow):
         box.addWidget(_label("Horario de trabajo", "sectionTitle"))
         row = QHBoxLayout()
         self.schedule_time = QTimeEdit(); self.schedule_time.setDisplayFormat("HH:mm")
+        self.schedule_time.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         self.schedule_tolerance = QSpinBox(); self.schedule_tolerance.setRange(0, 240); self.schedule_tolerance.setSuffix(" minutos")
+        self.schedule_tolerance.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         for text, widget in [("Hora oficial de entrada", self.schedule_time), ("Tolerancia de tardanza", self.schedule_tolerance)]:
             group = QVBoxLayout(); group.addWidget(_label(text, "muted")); group.addWidget(widget); row.addLayout(group)
         row.addStretch(1); box.addLayout(row)

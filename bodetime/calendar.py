@@ -287,7 +287,7 @@ class GlassDateEdit(QDateEdit):
     def __init__(
         self,
         selected: QDate,
-        accent: str = "#16877B",
+        accent: str = "#007AFF",
         calendar_style: str = "glass",
         animated: bool = True,
         parent: QWidget | None = None,

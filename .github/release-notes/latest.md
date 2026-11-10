@@ -1,8 +1,9 @@
-## Novedades de BODETIME 1.0.9
+## Novedades de BODETIME 1.1.0
 
-- El botón **Buscar e instalar** busca una versión publicada y, si hay una nueva, inicia el flujo de instalación desde BODETIME. El usuario confirma antes de descargar; la aplicación verifica el SHA-256 y muestra el avance. Windows puede pedir permiso para completar la instalación.
-- El calendario flotante de estilo **Cristal claro** ahora aparece y se cierra con una expansión y desvanecimiento más suaves. **Blanco clásico** conserva una superficie blanca sólida.
-- El panel principal muestra un reloj analógico y digital con hora y fecha locales en español; el color de las manecillas sigue el acento elegido.
-- La entrada de BODETIME combina una aparición y un leve acercamiento de la marca mientras se prepara la conexión con MySQL.
+- Se corrigieron los fondos de las pantallas y de Configuración para que respeten el tema claro u oscuro, y se suavizó el aspecto de los selectores de hora.
+- Se actualizó la marca de BODETIME con un símbolo vectorial minimalista de hoja de reporte, visible también en el icono de la ventana y la pantalla de inicio.
+- El panel ahora permite elegir entre reloj digital y analógico. La preferencia se guarda en este equipo y solo se muestra el estilo seleccionado.
+- Los reportes de asistencia pueden exportarse a PDF o Excel desde la aplicación. Ambos formatos parten de los datos consultados en MySQL y respetan el período y el filtro de trabajador.
+- Se renovaron los colores predeterminados con una base azul sistema y superficies claras, además de mejorar el contraste en temas, controles y elementos seleccionados.
 
-La animación del calendario y de inicio sigue la preferencia para activar o desactivar los efectos. La actualización no cambia la base de datos ni los datos guardados por la bodega.
+La actualización conserva la configuración local y los registros de la base de datos. El instalador se genera en Windows mediante GitHub Actions.

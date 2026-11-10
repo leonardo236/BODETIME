@@ -14,10 +14,10 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 from .services import AttendanceRow
 
 
-FOREST = colors.HexColor("#244A35")
-LEAF = colors.HexColor("#6D9F5E")
-PALE = colors.HexColor("#EFF5EC")
-INK = colors.HexColor("#2E4035")
+NAVY = colors.HexColor("#17324F")
+ACCENT = colors.HexColor("#007AFF")
+PALE = colors.HexColor("#EAF2FC")
+INK = colors.HexColor("#1D2733")
 
 
 def generate_attendance_pdf(path: str | Path, rows: list[AttendanceRow], start: date, end: date, worker_label: str = "Todos") -> Path:
@@ -25,7 +25,7 @@ def generate_attendance_pdf(path: str | Path, rows: list[AttendanceRow], start: 
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
     styles = getSampleStyleSheet()
-    title = ParagraphStyle("BodeTitle", parent=styles["Title"], fontName="Helvetica-Bold", fontSize=18, leading=22, textColor=FOREST, alignment=TA_LEFT, spaceAfter=4)
+    title = ParagraphStyle("BodeTitle", parent=styles["Title"], fontName="Helvetica-Bold", fontSize=18, leading=22, textColor=NAVY, alignment=TA_LEFT, spaceAfter=4)
     subtitle = ParagraphStyle("BodeSubtitle", parent=styles["Normal"], fontSize=9, leading=13, textColor=INK)
     body = ParagraphStyle("BodeBody", parent=styles["Normal"], fontSize=8, leading=10, textColor=INK)
     flow = [Paragraph("BODETIME | Reporte de asistencia", title),
@@ -39,12 +39,12 @@ def generate_attendance_pdf(path: str | Path, rows: list[AttendanceRow], start: 
     # TableStyle da color al encabezado y alterna el fondo de las filas.
     table = Table(data, colWidths=[1.0 * inch, 1.0 * inch, 4.5 * inch, 1.05 * inch, 1.05 * inch, 1.3 * inch], repeatRows=1, hAlign="LEFT")
     table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), FOREST), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("BACKGROUND", (0, 0), (-1, 0), NAVY), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"), ("FONTSIZE", (0, 0), (-1, 0), 8),
         ("ALIGN", (0, 0), (-1, 0), "LEFT"), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, PALE]),
         ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#D6E0E5")),
-        ("LINEBELOW", (0, 0), (-1, 0), 1.2, LEAF), ("FONTSIZE", (0, 1), (-1, -1), 8),
+        ("LINEBELOW", (0, 0), (-1, 0), 1.2, ACCENT), ("FONTSIZE", (0, 1), (-1, -1), 8),
         ("LEFTPADDING", (0, 0), (-1, -1), 7), ("RIGHTPADDING", (0, 0), (-1, -1), 7),
         ("TOPPADDING", (0, 0), (-1, -1), 7), ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
     ]))
