@@ -1,19 +1,23 @@
 from __future__ import annotations
 
+import os
 from datetime import date, timedelta
 from pathlib import Path
 
 from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QRegularExpression, Qt, QTime, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices, QRegularExpressionValidator
 from PySide6.QtWidgets import (
-    QAbstractItemView, QApplication, QComboBox, QDateEdit, QFileDialog, QFrame,
+    QAbstractItemView, QApplication, QComboBox, QDateEdit, QFileDialog, QFrame, QGraphicsOpacityEffect,
     QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox, QProgressBar, QPushButton,
-    QSpinBox, QStackedWidget, QTableWidget, QTableWidgetItem, QTimeEdit,
+    QProgressDialog, QSpinBox, QStackedWidget, QTableWidget, QTableWidgetItem, QTimeEdit,
     QVBoxLayout, QWidget,
 )
 
 from .reports import generate_attendance_pdf
 from .services import BodeTimeService, ValidationError, AttendanceRow
+from .update_tasks import InstallerDownloadTask, ReleaseCheckTask
+from .updater import ReleaseInfo
+from .version import APP_VERSION
 
 
 STYLESHEET = """
@@ -36,6 +40,12 @@ QLabel#topDate { color: #43594B; font-size: 9pt; font-weight: 600; padding: 8px 
 QFrame#connectionBanner { background: #FFF4DF; border: 1px solid #F0D8A8; border-radius: 12px; }
 QLabel#bannerText { color: #75430C; padding: 9px 10px; }
 QPushButton#retryDatabase { background: #F6E4BD; color: #694000; margin: 5px; }
+QFrame#updateBanner { background: #EAF0E8; border: 1px solid #D2DED1; border-radius: 12px; }
+QLabel#updateText { color: #354F3D; padding: 9px 10px; font-weight: 600; }
+QPushButton#updateNow { background: #5B8067; color: white; margin: 5px; }
+QPushButton#updateNow:hover { background: #4E705A; }
+QPushButton#updateNotes { background: #DDE7DC; color: #354B3D; margin: 5px; }
+QPushButton#dismissUpdate { background: transparent; color: #5E7063; padding: 7px; }
 QMessageBox { background: #FFFFFF; }
 QMessageBox QLabel { color: #26392E; min-width: 360px; }
 QMessageBox QPushButton { min-width: 76px; }
@@ -158,6 +168,13 @@ class MainWindow(QMainWindow):
         self.content.setObjectName("content")
         self._intro_started = False
         self._intro_finished = False
+        self._page_animation: QPropertyAnimation | None = None
+        self._page_effect: QGraphicsOpacityEffect | None = None
+        self._transition_widget: QWidget | None = None
+        self.latest_release: ReleaseInfo | None = None
+        self._release_check_task: ReleaseCheckTask | None = None
+        self._installer_download_task: InstallerDownloadTask | None = None
+        self._update_progress_dialog: QProgressDialog | None = None
         self.window_animation = QPropertyAnimation(self, b"windowOpacity", self)
         self.window_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
         self.window_animation.finished.connect(self._finish_intro)
@@ -184,6 +201,31 @@ class MainWindow(QMainWindow):
         banner_layout.addWidget(self.banner_text, 1)
         banner_layout.addWidget(retry)
         content_layout.addWidget(self.banner)
+        self.update_banner = QFrame()
+        self.update_banner.setObjectName("updateBanner")
+        self.update_banner.setVisible(False)
+        update_layout = QHBoxLayout(self.update_banner)
+        update_layout.setContentsMargins(8, 4, 8, 4)
+        self.update_banner_text = QLabel()
+        self.update_banner_text.setObjectName("updateText")
+        self.update_banner_text.setWordWrap(True)
+        self.update_banner_text.setMinimumWidth(240)
+        self.update_now_button = QPushButton("Actualizar ahora")
+        self.update_now_button.setObjectName("updateNow")
+        self.update_now_button.clicked.connect(self.start_update_download)
+        notes_button = QPushButton("Novedades")
+        notes_button.setObjectName("updateNotes")
+        notes_button.clicked.connect(self.open_release_notes)
+        dismiss_button = QPushButton("×")
+        dismiss_button.setObjectName("dismissUpdate")
+        dismiss_button.setFixedWidth(36)
+        dismiss_button.setToolTip("Ocultar aviso por ahora")
+        dismiss_button.clicked.connect(lambda: self.update_banner.setVisible(False))
+        update_layout.addWidget(self.update_banner_text, 1)
+        update_layout.addWidget(self.update_now_button)
+        update_layout.addWidget(notes_button)
+        update_layout.addWidget(dismiss_button)
+        content_layout.addWidget(self.update_banner)
         self.stack = QStackedWidget()
         content_layout.addWidget(self.stack, 1)
         root_layout.addWidget(self.sidebar)
@@ -201,22 +243,22 @@ class MainWindow(QMainWindow):
         self.database_retry_timer = QTimer(self)
         self.database_retry_timer.setInterval(15000)
         self.database_retry_timer.timeout.connect(self._auto_retry_database)
+        self.update_timer = QTimer(self)
+        self.update_timer.setInterval(6 * 60 * 60 * 1000)
+        self.update_timer.timeout.connect(self.check_for_updates)
+        self.update_timer.start()
         self._update_clock()
         if database_error:
             self.set_database_error(database_error)
         else:
             self.refresh_all()
+        QTimer.singleShot(1800, self.check_for_updates)
 
     def navigate(self, index: int) -> None:
         changed = self.stack.currentIndex() != index
         self.stack.setCurrentIndex(index)
         if changed and self._intro_finished:
-            self.window_animation.stop()
-            self.setWindowOpacity(0.92)
-            self.window_animation.setDuration(180)
-            self.window_animation.setStartValue(0.92)
-            self.window_animation.setEndValue(1.0)
-            self.window_animation.start()
+            self._fade_current_page()
         for i, button in enumerate(self.nav_buttons):
             button.setProperty("active", i == index)
             button.style().unpolish(button)
@@ -240,8 +282,169 @@ class MainWindow(QMainWindow):
             self.window_animation.setEndValue(1.0)
             QTimer.singleShot(50, self.window_animation.start)
 
+    def closeEvent(self, event) -> None:
+        if hasattr(self, "update_timer"):
+            self.update_timer.stop()
+        tasks = [self._release_check_task, self._installer_download_task]
+        if self._installer_download_task and self._installer_download_task.isRunning():
+            self._installer_download_task.cancel()
+        for task in tasks:
+            if task and task.isRunning() and not task.wait(6500):
+                event.ignore()
+                self.statusBar().showMessage("Espera a que termine la tarea de actualización para cerrar BODETIME.")
+                return
+        super().closeEvent(event)
+
     def _finish_intro(self) -> None:
         self._intro_finished = True
+
+    def _fade_current_page(self) -> None:
+        if self._page_animation and self._page_animation.state() == QPropertyAnimation.State.Running:
+            self._page_animation.stop()
+        if self._transition_widget is not None:
+            self._transition_widget.setGraphicsEffect(None)
+        page = self.stack.currentWidget()
+        if page is None:
+            return
+        effect = QGraphicsOpacityEffect(page)
+        effect.setOpacity(0.72)
+        page.setGraphicsEffect(effect)
+        animation = QPropertyAnimation(effect, b"opacity", self)
+        animation.setDuration(220)
+        animation.setStartValue(0.72)
+        animation.setEndValue(1.0)
+        animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        animation.finished.connect(lambda: page.setGraphicsEffect(None))
+        self._page_effect = effect
+        self._transition_widget = page
+        self._page_animation = animation
+        animation.start()
+
+    def check_for_updates(self, manual: bool = False) -> None:
+        if self._release_check_task and self._release_check_task.isRunning():
+            if manual:
+                self.update_status.setText("La búsqueda de actualizaciones ya está en curso…")
+            return
+        if manual:
+            self.update_status.setText("Buscando una versión nueva…")
+            self.check_updates_button.setEnabled(False)
+        task = ReleaseCheckTask(self)
+        self._release_check_task = task
+        task.checked.connect(lambda release: self._update_check_finished(release, manual))
+        task.failed.connect(lambda message: self._update_check_failed(message, manual))
+        task.finished.connect(lambda: setattr(self, "_release_check_task", None))
+        task.finished.connect(task.deleteLater)
+        task.start()
+
+    def _update_check_finished(self, release: ReleaseInfo | None, manual: bool) -> None:
+        self.check_updates_button.setEnabled(True)
+        self.latest_release = release
+        if release is None:
+            self.update_banner.setVisible(False)
+            self.update_status.setText(f"BODETIME {APP_VERSION} está actualizado.")
+            if manual:
+                QMessageBox.information(self, "BODETIME está actualizado", f"Estás usando la versión {APP_VERSION}.")
+            return
+        self.update_banner_text.setText(
+            f"BODETIME {release.version} está disponible. Puedes instalarla ahora; tus datos locales se conservarán."
+        )
+        self.update_now_button.setText(f"Actualizar a {release.version}")
+        self.update_banner.setVisible(True)
+        self._fade_widget(self.update_banner, 220)
+        self.update_status.setText(f"Versión {release.version} disponible (actual: {APP_VERSION}).")
+
+    def _update_check_failed(self, message: str, manual: bool) -> None:
+        self.check_updates_button.setEnabled(True)
+        self.update_status.setText("No se pudo comprobar si hay una versión nueva.")
+        if manual:
+            QMessageBox.warning(self, "No se pudo buscar", message)
+
+    def _fade_widget(self, widget: QWidget, duration: int = 200) -> None:
+        effect = QGraphicsOpacityEffect(widget)
+        effect.setOpacity(0.0)
+        widget.setGraphicsEffect(effect)
+        animation = QPropertyAnimation(effect, b"opacity", self)
+        animation.setDuration(duration)
+        animation.setStartValue(0.0)
+        animation.setEndValue(1.0)
+        animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        animation.finished.connect(lambda: widget.setGraphicsEffect(None))
+        animation.start()
+        # Keep a reference while Qt animates its property.
+        if not hasattr(self, "_notice_animations"):
+            self._notice_animations = []
+        self._notice_animations.append(animation)
+        animation.finished.connect(lambda: self._notice_animations.remove(animation) if animation in self._notice_animations else None)
+
+    def open_release_notes(self) -> None:
+        if self.latest_release:
+            QDesktopServices.openUrl(QUrl(self.latest_release.notes_url))
+
+    def start_update_download(self) -> None:
+        release = self.latest_release
+        if release is None:
+            self.check_for_updates(manual=True)
+            return
+        answer = QMessageBox.question(
+            self,
+            "Actualizar BODETIME",
+            f"Se descargará y verificará la versión {release.version}. Después se abrirá el instalador de Windows y BODETIME se cerrará. Puede aparecer una solicitud de permiso del sistema.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        self.update_now_button.setEnabled(False)
+        self._update_progress_dialog = QProgressDialog("Descargando actualización verificada…", "Cancelar", 0, 100, self)
+        self._update_progress_dialog.setWindowTitle("Actualización de BODETIME")
+        self._update_progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
+        self._update_progress_dialog.setMinimumDuration(0)
+        self._update_progress_dialog.setValue(0)
+        task = InstallerDownloadTask(release)
+        self._installer_download_task = task
+        task.progress.connect(self._update_progress_dialog.setValue)
+        self._update_progress_dialog.canceled.connect(task.cancel)
+        task.ready.connect(self._update_download_ready)
+        task.failed.connect(self._update_download_failed)
+        task.cancelled.connect(self._update_download_cancelled)
+        task.finished.connect(lambda: setattr(self, "_installer_download_task", None))
+        task.finished.connect(task.deleteLater)
+        task.start()
+
+    def _close_update_progress(self) -> None:
+        if self._update_progress_dialog is not None:
+            self._update_progress_dialog.close()
+            self._update_progress_dialog.deleteLater()
+            self._update_progress_dialog = None
+        self.update_now_button.setEnabled(True)
+
+    def _update_download_ready(self, installer_path: str) -> None:
+        self._close_update_progress()
+        try:
+            if os.name != "nt":
+                raise OSError("La instalación automática está disponible en Windows.")
+            os.startfile(installer_path, "runas")
+        except OSError as exc:
+            QMessageBox.critical(
+                self,
+                "No se pudo abrir el instalador",
+                f"El archivo descargado y verificado sigue disponible aquí:\n{installer_path}\n\nDetalle: {exc}",
+            )
+            return
+        QMessageBox.information(
+            self,
+            "Instalador iniciado",
+            "Sigue los pasos del instalador. BODETIME se cerrará para completar la actualización; la base de datos no se modifica.",
+        )
+        QTimer.singleShot(250, QApplication.instance().quit)
+
+    def _update_download_failed(self, message: str) -> None:
+        self._close_update_progress()
+        QMessageBox.warning(self, "No se pudo descargar", message)
+
+    def _update_download_cancelled(self) -> None:
+        self._close_update_progress()
+        self.statusBar().showMessage("Descarga cancelada; BODETIME no se actualizó.", 6000)
 
     def set_database_error(self, message: str) -> None:
         self.database_error = message
@@ -722,7 +925,22 @@ class MainWindow(QMainWindow):
         box.addWidget(_label("Una llegada se marca tarde cuando supera la hora de inicio más la tolerancia. El cambio se aplica a los marcajes futuros.", "muted"))
         self.schedule_status = _label("El horario debe confirmarse con la bodega antes de guardar.", "muted")
         box.addWidget(self.schedule_status)
-        layout.addWidget(panel); layout.addStretch(1)
+        layout.addWidget(panel)
+        update_panel = _panel()
+        update_box = QVBoxLayout(update_panel)
+        update_box.setContentsMargins(22, 20, 22, 20)
+        update_box.setSpacing(10)
+        update_box.addWidget(_label("Actualizaciones", "sectionTitle"))
+        update_box.addWidget(_label("BODETIME comprueba versiones nuevas al abrirse y cada seis horas. La instalación conserva la base de datos.", "muted"))
+        update_row = QHBoxLayout()
+        self.update_status = _label(f"Versión instalada: {APP_VERSION}", "muted")
+        update_row.addWidget(self.update_status, 1)
+        self.check_updates_button = QPushButton("Buscar actualización")
+        self.check_updates_button.clicked.connect(lambda: self.check_for_updates(manual=True))
+        update_row.addWidget(self.check_updates_button)
+        update_box.addLayout(update_row)
+        layout.addWidget(update_panel)
+        layout.addStretch(1)
         self.stack.addWidget(page)
 
     def refresh_settings(self, silent: bool = False) -> None:

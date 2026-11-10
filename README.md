@@ -30,6 +30,8 @@ Al publicar una etiqueta `v*` en GitHub, Actions ejecuta las pruebas, empaqueta 
 
 **Requisito:** cada computadora debe tener MySQL Server 8 instalado y en ejecución. El asistente de BODETIME configura la base y la cuenta de aplicación, pero no instala el servidor MySQL. La contraseña administradora solo se usa durante esa configuración; no se guarda. No publiques `.env` ni credenciales en GitHub.
 
+La aplicación comprueba si hay una versión más reciente al iniciar y cada seis horas. Cuando hay una, muestra el aviso dentro de BODETIME; **Actualizar ahora** descarga el instalador de GitHub, comprueba su SHA-256 y solicita confirmación antes de abrirlo. Windows puede pedir permiso de administrador. La base de datos y el archivo de configuración del usuario no forman parte de la actualización, y el asistente inicial de MySQL no vuelve a abrirse si esa configuración ya existe. Las versiones anteriores a la 1.0.4 deben instalar esta versión manualmente una primera vez; después recibirán los avisos dentro de la aplicación.
+
 Abre PowerShell en esta carpeta:
 
 ```powershell
@@ -56,6 +58,7 @@ La pantalla principal intenta conectar a MySQL al abrirse. Si el servidor no res
 - **Tardanzas:** se marcan cuando la entrada supera la hora de inicio más la tolerancia. Se evalúan con la configuración vigente al registrar la entrada.
 - **Reportes:** consulta de MySQL con fechas y trabajador opcional. El botón **Generar PDF** usa ReportLab (`Table`, `TableStyle`), pide ruta y permite abrir el archivo creado. Si no hay resultados, no crea un PDF vacío.
 - **Configuración:** hora de entrada y tolerancia, guardadas en MySQL.
+- **Actualizaciones:** comprobación de versiones publicadas, aviso integrado, descarga verificada y apertura del instalador de Windows.
 
 ## Arquitectura
 
@@ -109,7 +112,7 @@ Variables soportadas en `.env`: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_
 
 ## Alcance de la verificación local
 
-En esta actualización (9 de noviembre de 2026), `pytest -q` reportó **17 pruebas aprobadas**, `compileall` terminó correctamente y `git diff --check` no encontró errores de formato. La conexión real a MySQL no se volvió a verificar como parte de esta actualización. En una revisión local anterior, el 3 de noviembre de 2026:
+En esta actualización (9 de noviembre de 2026), `pytest -q` reportó **26 pruebas aprobadas**, `compileall` terminó correctamente y `git diff --check` no encontró errores de formato. La conexión real a MySQL no se volvió a verificar como parte de esta actualización. En una revisión local anterior, el 3 de noviembre de 2026:
 
 - La consulta de conexión SQLAlchemy/PyMySQL y la aplicación pudieron leer la base MySQL. La ventana PySide6 quedó abierta y el panel confirmó el estado **MySQL conectado**.
 - Una verificación de integración temporal comprobó alta, lectura, actualización, código duplicado, desactivación, entradas y salidas válidas, rechazo de marcajes inválidos o duplicados, historial y generación ReportLab con filas recuperadas de MySQL. Los registros temporales y el PDF se eliminaron y la configuración de horario previa se restauró. No se incluyeron datos personales en el repositorio.

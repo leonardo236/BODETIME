@@ -7,6 +7,7 @@ from bodetime.models import Attendance, Worker
 from bodetime.services import AttendanceRow, BodeTimeService, ValidationError, is_late
 from bodetime.ui import MainWindow
 from bodetime.setup_wizard import is_valid_database_name
+from main import should_open_setup_wizard
 
 
 def test_worker_code_is_trimmed_and_uppercased():
@@ -94,3 +95,9 @@ def test_setup_wizard_only_accepts_safe_mysql_database_identifiers():
     assert is_valid_database_name("bodetime_2026")
     assert not is_valid_database_name("bode-time")
     assert not is_valid_database_name("bode time; DROP DATABASE bodetime")
+
+
+def test_update_installer_does_not_restart_database_setup_for_existing_users():
+    assert should_open_setup_wizard(first_install_only=True, settings_file_exists=False)
+    assert not should_open_setup_wizard(first_install_only=True, settings_file_exists=True)
+    assert should_open_setup_wizard(first_install_only=False, settings_file_exists=True)

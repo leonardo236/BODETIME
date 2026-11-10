@@ -1,6 +1,6 @@
 #define AppName "BODETIME"
 #ifndef AppVersion
-  #define AppVersion "1.0.0"
+  #define AppVersion "1.0.4"
 #endif
 
 [Setup]
@@ -17,6 +17,8 @@ SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64
 ArchitecturesAllowed=x64
 PrivilegesRequired=admin
+CloseApplications=yes
+RestartApplications=no
 WizardStyle=modern
 DisableProgramGroupPage=yes
 UninstallDisplayName=BODETIME
@@ -36,4 +38,4 @@ Name: "{autoprograms}\Configurar conexión de MySQL"; Filename: "{app}\BODETIME.
 Name: "{autoprograms}\Guía de configuración BODETIME"; Filename: "{app}\README-INSTALADOR.txt"
 
 [Run]
-Filename: "{app}\BODETIME.exe"; Parameters: "--configurar-base"; Description: "Configurar MySQL ahora (recomendado)"; Flags: postinstall runasoriginaluser skipifsilent
+Filename: "{app}\BODETIME.exe"; Parameters: "--configurar-base --setup-inicial"; Description: "Configurar MySQL ahora (recomendado)"; Flags: postinstall runasoriginaluser skipifsilent

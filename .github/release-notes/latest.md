@@ -1,9 +1,13 @@
-## Novedades de BODETIME 1.0.3
+## Novedades de BODETIME 1.0.4
 
-- Validación más estricta para códigos, nombres, apellidos, cargos y teléfonos de trabajadores.
-- Edición explícita del trabajador seleccionado, con protección para evitar guardar cambios en otra fila.
-- Reactivación de trabajadores inactivos; las asistencias históricas se conservan al desactivar.
-- Interfaz con tonos salvia y neutros más suaves para una lectura más cómoda.
+- Actualizaciones integradas: BODETIME avisa cuando se publica una versión nueva.
+- Descarga del instalador desde GitHub con verificación SHA-256 antes de ejecutarlo.
+- Las actualizaciones conservan la configuración MySQL existente y no vuelven a abrir el asistente inicial.
+- Transiciones suaves al navegar y avisos con animación discreta.
+
+## Primera actualización
+
+La versión 1.0.3 no tiene un comprobador de actualizaciones; por eso debe instalarse la 1.0.4 una vez desde esta publicación. A partir de la 1.0.4, las versiones futuras aparecerán dentro de la aplicación.
 
 ## Instalación
 
@@ -11,4 +15,4 @@ Descarga **BODETIME-Setup.exe** desde los archivos de esta publicación. Se requ
 
 ## Datos y límites
 
-Los cambios afectan nuevas altas y ediciones. Los registros existentes no se borran ni modifican automáticamente. La suite local contiene 17 pruebas aprobadas; la conexión a MySQL se debe verificar en cada computadora.
+La base de datos y la configuración del usuario se conservan. La suite local contiene 26 pruebas aprobadas; la conexión a MySQL se debe verificar en cada computadora.
